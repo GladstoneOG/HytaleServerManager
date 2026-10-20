@@ -19,11 +19,19 @@ class TrayManager {
   }
 
   init() {
-    const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
+    const fs = require('fs');
+    const assetsDir = path.join(__dirname, '..', 'assets');
+    const icoPath = path.join(assetsDir, 'tray-icon.ico');
+    const pngPath = path.join(assetsDir, 'tray-icon.png');
+
+    let iconPath = pngPath;
+    if (process.platform === 'win32' && fs.existsSync(icoPath)) {
+      iconPath = icoPath;
+    }
+
     let icon = nativeImage.createFromPath(iconPath);
-    if (icon.isEmpty()) {
-      // Fallback 16x16 transparent image
-      icon = nativeImage.createEmpty();
+    if (icon.isEmpty() && fs.existsSync(pngPath)) {
+      icon = nativeImage.createFromPath(pngPath);
     }
 
     this.tray = new Tray(icon);

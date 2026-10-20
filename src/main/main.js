@@ -53,6 +53,7 @@ async function createWindow() {
     height: 840,
     minWidth: 1024,
     minHeight: 700,
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     title: 'Hytale Server Mod Manager & Updater',
     backgroundColor: '#0f141c',
     webPreferences: {
