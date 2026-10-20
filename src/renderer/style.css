@@ -512,6 +512,12 @@ summary,
   background: var(--accent-hover);
 }
 
+.server-toggle:not(.btn-stop) {
+  background: #10b981;
+  color: #051b11;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
 .btn-start {
   background: #10b981;
   color: #051b11;
@@ -693,8 +699,8 @@ summary,
   display: inline-flex;
   align-items: center;
   flex: 1;
-  min-width: 180px;
-  max-width: 320px;
+  min-width: 140px;
+  width: 100%;
 }
 
 .search .ic {

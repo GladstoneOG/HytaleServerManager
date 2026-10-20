@@ -340,7 +340,7 @@ function switchTab(tabId) {
   }
 
   if (tabId === 'library') {
-    loadInstalledMods(false);
+    loadInstalledMods(true); // Auto-check for updates every time library is opened
   } else if (tabId === 'browse') {
     if (currentBrowseSource === 'curseforge' && !cfLoadedOnce) loadCurseForgeMods();
     if (currentBrowseSource === 'thunderstore' && !tsLoadedOnce) loadThunderstoreMods();
@@ -480,28 +480,24 @@ async function refreshAccountStatus() {
 
     if (status.authenticated && !status.isExpired) {
       sidebarAccountDot.className = 'dot dot-ok';
-      const displayName = status.username || (status.email ? status.email.split('@')[0] : 'Connected User');
-      const emailText = status.email || 'Connected';
+      const displayName = status.username || (status.email ? status.email.split('@')[0] : 'Player');
 
-      // FIX 1: Show actual Hytale account name in sidebar and overview
       sidebarAccountName.textContent = displayName;
-      sidebarAccountText.textContent = emailText;
-      sidebarAccount.title = `${displayName} (${emailText})`;
+      sidebarAccountText.textContent = `Connected as ${displayName}`;
+      sidebarAccount.title = `Connected as ${displayName}`;
       sidebarAccountAvatar.textContent = displayName.charAt(0).toUpperCase();
 
       dashAuthUserTitle.textContent = displayName;
       dashAuthBadge.className = 'tag tag-success';
       dashAuthBadge.textContent = 'Connected';
-      dashAuthDesc.textContent = status.email
-        ? `Connected as ${status.email} (${status.branch || 'release'} channel). Official server updates are enabled.`
-        : `Signed in on ${status.branch || 'release'} channel. Official server updates are enabled.`;
+      dashAuthDesc.textContent = `Connected as ${displayName}`;
       btnDashLoginHytale.querySelector('span').textContent = 'Reconnect';
 
-      settingsAccountDesc.textContent = `Connected as ${displayName} (${emailText}). Credentials saved in server folder.`;
+      settingsAccountDesc.textContent = `Connected as ${displayName}`;
       btnTriggerDeviceLogin.textContent = 'Reconnect';
     } else if (status.authenticated && status.isExpired) {
       sidebarAccountDot.className = 'dot dot-warn';
-      const displayName = status.username || 'Session expired';
+      const displayName = status.username || 'Account';
       sidebarAccountName.textContent = displayName;
       sidebarAccountText.textContent = 'Session expired';
       sidebarAccountAvatar.textContent = '⚠';
@@ -509,7 +505,7 @@ async function refreshAccountStatus() {
       dashAuthUserTitle.textContent = displayName;
       dashAuthBadge.className = 'tag tag-warning';
       dashAuthBadge.textContent = 'Expired';
-      dashAuthDesc.textContent = 'Your session expired. Sign in again to check for and install server updates.';
+      dashAuthDesc.textContent = 'Session expired. Sign in again to refresh.';
       btnDashLoginHytale.querySelector('span').textContent = 'Sign in';
 
       settingsAccountDesc.textContent = 'Session expired. Sign in again to refresh.';
@@ -517,16 +513,16 @@ async function refreshAccountStatus() {
     } else {
       sidebarAccountDot.className = 'dot dot-muted';
       sidebarAccountName.textContent = 'Hytale account';
-      sidebarAccountText.textContent = 'Not signed in';
+      sidebarAccountText.textContent = 'Not connected';
       sidebarAccountAvatar.innerHTML = '<svg class="ic"><use href="#i-user"/></svg>';
 
       dashAuthUserTitle.textContent = 'Hytale account';
       dashAuthBadge.className = 'tag';
-      dashAuthBadge.textContent = 'Not signed in';
-      dashAuthDesc.textContent = 'Sign in to download server updates directly from Hytale.';
+      dashAuthBadge.textContent = 'Not connected';
+      dashAuthDesc.textContent = 'Sign in to download official server updates.';
       btnDashLoginHytale.querySelector('span').textContent = 'Sign in';
 
-      settingsAccountDesc.textContent = 'Used to download official server updates.';
+      settingsAccountDesc.textContent = 'Sign in to download official server updates.';
       btnTriggerDeviceLogin.textContent = 'Sign in';
     }
   } catch {
@@ -885,6 +881,9 @@ function renderInstalledModsList() {
     }
     return 0;
   });
+
+  const isFiltering = query !== '' || currentModsSourceFilter !== 'all' || currentModsFilter !== 'all';
+  navModsCount.textContent = isFiltering ? `${filtered.length}` : `${currentInstalledMods.length}`;
 
   updateBatchBarState(filtered);
 
@@ -1274,6 +1273,9 @@ function getSortFieldForCurseForge(val) {
   }
 }
 
+let currentCfTotalCount = 0;
+let currentCfMaxPages = 1;
+
 async function loadCurseForgeMods() {
   try {
     renderSkeletonCards(cfResultsGrid, 6);
@@ -1296,12 +1298,8 @@ async function loadCurseForgeMods() {
 
     cfLoadedOnce = true;
     rawBrowseModsCache = res.data || [];
-    const total = res.pagination?.totalCount || 0;
-    const maxPages = Math.max(1, Math.ceil(total / CF_PAGE_SIZE));
-
-    cfPageInfo.textContent = `Page ${cfPageIndex + 1} of ${maxPages}`;
-    cfPrevPage.disabled = cfPageIndex === 0;
-    cfNextPage.disabled = cfPageIndex >= maxPages - 1;
+    currentCfTotalCount = res.pagination?.totalCount || 0;
+    currentCfMaxPages = Math.max(1, Math.ceil(currentCfTotalCount / CF_PAGE_SIZE));
 
     applyBrowseFilters();
   } catch (e) {
@@ -1348,6 +1346,18 @@ function renderCurseForgeFilteredResults() {
     mods.sort((a, b) => new Date(b.dateModified || 0).getTime() - new Date(a.dateModified || 0).getTime());
   } else if (sort === 'name') {
     mods.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+
+  // FIX 3: Update page / results count accurately when filtered
+  const hasClientFilters = selectedBrowseCategories.size > 0 || browseUpdatedFilter.value !== 'all';
+  if (hasClientFilters) {
+    cfPageInfo.textContent = `${mods.length} mod${mods.length === 1 ? '' : 's'}`;
+    cfPrevPage.disabled = true;
+    cfNextPage.disabled = true;
+  } else {
+    cfPageInfo.textContent = `Page ${cfPageIndex + 1} of ${currentCfMaxPages}`;
+    cfPrevPage.disabled = cfPageIndex === 0;
+    cfNextPage.disabled = cfPageIndex >= currentCfMaxPages - 1;
   }
 
   if (mods.length === 0) {

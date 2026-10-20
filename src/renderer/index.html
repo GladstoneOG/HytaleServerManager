@@ -100,7 +100,7 @@
           <div id="topbar-status" class="status-pill is-offline" role="status">
             <span class="status-dot"></span><span id="topbar-status-text">Stopped</span>
           </div>
-          <button id="quick-server-btn" class="btn btn-primary btn-sm server-toggle">
+          <button id="quick-server-btn" class="btn btn-start btn-sm server-toggle is-overview-hidden">
             <svg class="ic"><use href="#i-play"/></svg><span>Start</span>
           </button>
         </div>
@@ -139,7 +139,7 @@
                   <button id="hero-console-btn" class="btn btn-ghost">
                     <svg class="ic"><use href="#i-console"/></svg><span>Console</span>
                   </button>
-                  <button id="hero-server-btn" class="btn btn-primary server-toggle">
+                  <button id="hero-server-btn" class="btn btn-start server-toggle">
                     <svg class="ic"><use href="#i-play"/></svg><span>Start</span>
                   </button>
                 </div>
@@ -154,7 +154,7 @@
                     <span id="update-progress-text" class="progress-label">Preparing…</span>
                   </div>
                 </div>
-                <button id="btn-update-server-now" class="btn btn-primary btn-sm">Update</button>
+                <button id="btn-update-server-now" class="btn btn-update btn-sm">Update</button>
               </div>
             </div>
 
@@ -253,29 +253,29 @@
         <section id="tab-library" class="page" aria-label="Library">
           <div class="page-inner">
             <div class="toolbar">
-              <label class="search">
-                <svg class="ic"><use href="#i-search"/></svg>
-                <input type="search" id="mods-search-input" placeholder="Search your mods" data-page-search>
-              </label>
               <div class="segmented" id="mods-filter" role="radiogroup" aria-label="Filter">
                 <button data-value="all" class="active">All <span class="seg-count" data-count="all"></span></button>
                 <button data-value="enabled">Enabled <span class="seg-count" data-count="enabled"></span></button>
                 <button data-value="disabled">Disabled <span class="seg-count" data-count="disabled"></span></button>
                 <button data-value="updates">Updates <span class="seg-count" data-count="updates"></span></button>
               </div>
-              <select id="mods-source-filter" class="select" aria-label="Source">
-                <option value="all">All sources</option>
-                <option value="curseforge">CurseForge</option>
-                <option value="thunderstore">Thunderstore</option>
-                <option value="local">Local</option>
-              </select>
-              <select id="mods-sort-select" class="select" aria-label="Sort">
-                <option value="name-asc">Name (A–Z)</option>
-                <option value="name-desc">Name (Z–A)</option>
-                <option value="updated-desc">Recently updated</option>
-                <option value="size-desc">File size</option>
-              </select>
+              <label class="search">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <input type="search" id="mods-search-input" placeholder="Search your mods" data-page-search>
+              </label>
               <div class="toolbar-end">
+                <select id="mods-source-filter" class="select" aria-label="Source">
+                  <option value="all">All sources</option>
+                  <option value="curseforge">CurseForge</option>
+                  <option value="thunderstore">Thunderstore</option>
+                  <option value="local">Local</option>
+                </select>
+                <select id="mods-sort-select" class="select" aria-label="Sort">
+                  <option value="name-asc">Name (A–Z)</option>
+                  <option value="name-desc">Name (Z–A)</option>
+                  <option value="updated-desc">Recently updated</option>
+                  <option value="size-desc">File size</option>
+                </select>
                 <button id="btn-update-all-mods" class="btn btn-update btn-sm hidden">
                   <svg class="ic"><use href="#i-update"/></svg><span>Update all</span>
                 </button>
@@ -326,16 +326,18 @@
                 <svg class="ic"><use href="#i-search"/></svg>
                 <input type="search" id="browse-search-input" placeholder="Search mods" data-page-search>
               </label>
-              <button id="btn-toggle-filters" class="btn btn-secondary btn-sm" title="Advanced Filters">
-                <svg class="ic"><use href="#i-filter"/></svg><span>Filters</span>
-                <span id="filters-badge" class="tag tag-info hidden">0</span>
-              </button>
-              <select id="browse-sort-select" class="select" aria-label="Sort">
-                <option value="popular">Popular</option>
-                <option value="downloads">Most downloaded</option>
-                <option value="updated">Recently updated</option>
-                <option value="name">Name</option>
-              </select>
+              <div class="toolbar-end">
+                <button id="btn-toggle-filters" class="btn btn-secondary btn-sm" title="Advanced Filters">
+                  <svg class="ic"><use href="#i-filter"/></svg><span>Filters</span>
+                  <span id="filters-badge" class="tag tag-info hidden">0</span>
+                </button>
+                <select id="browse-sort-select" class="select" aria-label="Sort">
+                  <option value="popular">Popular</option>
+                  <option value="downloads">Most downloaded</option>
+                  <option value="updated">Recently updated</option>
+                  <option value="name">Name</option>
+                </select>
+              </div>
             </div>
 
             <!-- Advanced multi-parameter filters panel -->

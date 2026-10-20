@@ -44,6 +44,7 @@ auth.enc
 .DS_Store
 Thumbs.db
 Desktop.ini
+*.lnk
 .vscode/
 .idea/
 *.suo
