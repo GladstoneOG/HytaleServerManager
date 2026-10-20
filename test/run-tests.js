@@ -137,7 +137,29 @@ async function run() {
   console.log(`  Process scanner checked OS process table: isRunning=${scanResult.isRunning}, pid=${scanResult.pid}`);
   console.log('  ✓ ServerRunner initialized and process detection query verified');
 
-  console.log('\n🎉 ALL 11 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 12: Windows Shortcut Generator
+  console.log('Test 12: Windows Shortcut Generation');
+  const { createShortcut } = require('../scripts/create-shortcut');
+  const testShortcutDir = path.join(os.tmpdir(), `hytale_test_sc_${Date.now()}`);
+  await fsp.mkdir(testShortcutDir, { recursive: true });
+  try {
+    const scResult = createShortcut({ desktopDir: testShortcutDir });
+    console.log('  Shortcut result:', scResult);
+    if (process.platform === 'win32') {
+      assert.strictEqual(scResult.success, true);
+      assert(scResult.created.length > 0);
+      const testLnk = path.join(testShortcutDir, 'Hytale Server Manager.lnk');
+      const exists = await fsp.access(testLnk).then(() => true).catch(() => false);
+      assert.strictEqual(exists, true);
+    }
+    console.log('  ✓ Windows shortcut generation verified');
+  } finally {
+    try {
+      await fsp.rm(testShortcutDir, { recursive: true, force: true });
+    } catch {}
+  }
+
+  console.log('\n🎉 ALL 12 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

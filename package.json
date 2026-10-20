@@ -24,7 +24,9 @@
   "homepage": "https://github.com/GladstoneOG/HytaleServerManager#readme",
   "scripts": {
     "start": "electron .",
-    "test": "node test/run-tests.js"
+    "test": "node test/run-tests.js",
+    "postinstall": "node scripts/create-shortcut.js",
+    "create-shortcut": "node scripts/create-shortcut.js"
   },
   "dependencies": {
     "yauzl": "^3.4.0"

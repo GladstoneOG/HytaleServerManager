@@ -121,11 +121,16 @@ Before installing the manager, ensure you have:
    ```bash
    npm install
    ```
+   > [!NOTE]
+   > The `npm install` step automatically generates a **Desktop Shortcut**, **Start Menu Shortcut**, and project directory shortcut with the official app icon and zero command prompt flash.
 
 3. **Start the application:**
-   ```bash
-   npm start
-   ```
+   - Double-click **Hytale Server Manager** on your Desktop or Start Menu.
+   - Or run:
+     ```bash
+     npm start
+     ```
+   - You can also recreate shortcuts at any time via `npm run create-shortcut` or through the in-app button in **Settings > Desktop shortcut**.
 
 > [!TIP]
 > On Windows, you can double-click [`HytaleServerManager.vbs`](HytaleServerManager.vbs) to launch cleanly without any command prompt window, or run [`start.bat`](start.bat).

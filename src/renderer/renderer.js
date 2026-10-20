@@ -121,6 +121,7 @@ const settingsAutoStartServer = $('settings-auto-start-server');
 const settingsAccountDesc = $('settings-account-desc');
 const btnTriggerDeviceLogin = $('btn-trigger-device-login');
 const settingsCfApiKey = $('settings-cf-api-key');
+const btnCreateShortcut = $('btn-create-shortcut');
 
 // Setup Wizard Modal
 const installModal = $('install-modal');
@@ -2041,6 +2042,29 @@ const saveApiKeyDebounced = debounce(() => {
 }, 400);
 
 settingsCfApiKey.addEventListener('input', saveApiKeyDebounced);
+
+if (btnCreateShortcut) {
+  btnCreateShortcut.addEventListener('click', async () => {
+    const origText = btnCreateShortcut.textContent;
+    btnCreateShortcut.disabled = true;
+    btnCreateShortcut.textContent = 'Creating...';
+    try {
+      const res = await window.api.createShortcut();
+      if (res && res.success) {
+        btnCreateShortcut.textContent = 'Created!';
+      } else {
+        btnCreateShortcut.textContent = 'Failed';
+      }
+    } catch {
+      btnCreateShortcut.textContent = 'Failed';
+    } finally {
+      setTimeout(() => {
+        btnCreateShortcut.disabled = false;
+        btnCreateShortcut.textContent = origText;
+      }, 2000);
+    }
+  });
+}
 
 // Boot
 init();

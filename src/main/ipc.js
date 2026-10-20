@@ -58,6 +58,15 @@ function registerIpcHandlers({
     return { success: true };
   });
 
+  ipcMain.handle('app:create-shortcut', async () => {
+    try {
+      const { createShortcut } = require(path.join(__dirname, '..', '..', 'scripts', 'create-shortcut'));
+      return createShortcut();
+    } catch (e) {
+      return { success: false, error: e.message, created: [] };
+    }
+  });
+
   ipcMain.handle('dialog:select-server-dir', async () => {
     const res = await dialog.showOpenDialog(win, {
       title: 'Select Hytale Server Folder',

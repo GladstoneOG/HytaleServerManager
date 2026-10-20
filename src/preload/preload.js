@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
   getLoginItem: () => ipcRenderer.invoke('app:get-login-item'),
   setLoginItem: (enabled, openAsHidden) => ipcRenderer.invoke('app:set-login-item', enabled, openAsHidden),
+  createShortcut: () => ipcRenderer.invoke('app:create-shortcut'),
 
   // Hytale Account
   getHytaleStatus: () => ipcRenderer.invoke('hytale:get-status'),
