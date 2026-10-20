@@ -80,6 +80,8 @@ const consoleAutoScroll = document.getElementById('console-autoscroll');
 const btnClearConsole = document.getElementById('btn-clear-console');
 const consoleLaunchMode = document.getElementById('console-launch-mode');
 const detachedModeNotice = document.getElementById('detached-mode-notice');
+const consoleStatusDot = document.getElementById('console-status-dot');
+const consoleStatusBadge = document.getElementById('console-status-badge');
 
 // Settings Elements
 const settingsServerDir = document.getElementById('settings-server-dir');
@@ -1169,6 +1171,12 @@ function updateServerStatusUI(status) {
     sidebarServerBadge.textContent = 'Server Online';
     quickServerBtn.textContent = '⏹ Stop Server';
     quickServerBtn.className = 'btn btn-danger btn-sm';
+    if (consoleStatusDot) consoleStatusDot.className = 'console-dot dot-green';
+    if (consoleStatusBadge) {
+      consoleStatusBadge.className = 'badge badge-online';
+      consoleStatusBadge.textContent = status.isDetached ? `Detached (PID: ${status.pid})` : `Online (PID: ${status.pid})`;
+    }
+
     if (status.isDetached) {
       dashServerStatus.textContent = `Running (Independent Window - PID: ${status.pid})`;
       if (detachedModeNotice) {
@@ -1189,6 +1197,12 @@ function updateServerStatusUI(status) {
     quickServerBtn.textContent = '▶ Start Server';
     quickServerBtn.className = 'btn btn-primary btn-sm';
     dashServerStatus.textContent = 'Stopped';
+    if (consoleStatusDot) consoleStatusDot.className = 'console-dot dot-gray';
+    if (consoleStatusBadge) {
+      consoleStatusBadge.className = 'badge badge-offline';
+      consoleStatusBadge.textContent = 'Offline';
+    }
+
     if (detachedModeNotice) {
       if (consoleLaunchMode?.value === 'detached') {
         detachedModeNotice.classList.remove('hidden');

@@ -32,6 +32,16 @@ class ServerRunner extends EventEmitter {
   }
 
   getStatus() {
+    if (this.process && this.isRunning) {
+      try {
+        process.kill(this.process.pid, 0);
+      } catch {
+        this.isRunning = false;
+        this.isDetached = false;
+        this.process = null;
+        this.detachedPid = null;
+      }
+    }
     return {
       isRunning: this.isRunning,
       isDetached: this.isDetached,
@@ -44,15 +54,26 @@ class ServerRunner extends EventEmitter {
    * Check if an external or previously detached HytaleServer.jar process is running
    */
   async findRunningServerProcess() {
-    // If managed integrated process is active
+    // If managed integrated process is active, verify it is still alive in the OS
     if (this.isRunning && this.process) {
-      return { isRunning: true, pid: this.process.pid, managed: true };
+      try {
+        process.kill(this.process.pid, 0);
+        return { isRunning: true, pid: this.process.pid, managed: true };
+      } catch {
+        this.isRunning = false;
+        this.isDetached = false;
+        this.process = null;
+        this.detachedPid = null;
+        this.emit('status-change', this.getStatus());
+      }
     }
 
     return new Promise((resolve) => {
       // Query OS process table specifically for java processes running HytaleServer.jar
-      // IMPORTANT: Filter specifically by process executable name (java.exe / javaw.exe)
-      // so the querying shell (powershell.exe / cmd.exe) does not match its own commandline!
+      // IMPORTANT:
+      // 1. Only match java.exe or javaw.exe
+      // 2. Only match if CommandLine contains HytaleServer.jar
+      // 3. Open command prompt (cmd.exe) windows or other utilities are completely ignored!
       if (process.platform === 'win32') {
         execFile(
           'powershell.exe',
@@ -80,16 +101,26 @@ class ServerRunner extends EventEmitter {
             const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
             const pid = parseInt(lines[0], 10);
             if (pid && !isNaN(pid)) {
-              const wasRunning = this.isRunning;
-              const prevPid = this.detachedPid;
-              this.isRunning = true;
-              this.isDetached = true;
-              this.detachedPid = pid;
-              this._startDetachedMonitor();
-              if (!wasRunning || prevPid !== pid) {
-                this.emit('status-change', this.getStatus());
+              let alive = false;
+              try {
+                process.kill(pid, 0);
+                alive = true;
+              } catch {
+                alive = false;
               }
-              return resolve({ isRunning: true, pid, managed: false });
+
+              if (alive) {
+                const wasRunning = this.isRunning;
+                const prevPid = this.detachedPid;
+                this.isRunning = true;
+                this.isDetached = true;
+                this.detachedPid = pid;
+                this._startDetachedMonitor();
+                if (!wasRunning || prevPid !== pid) {
+                  this.emit('status-change', this.getStatus());
+                }
+                return resolve({ isRunning: true, pid, managed: false });
+              }
             }
 
             if (!this.process) {
@@ -258,24 +289,30 @@ class ServerRunner extends EventEmitter {
       this.emit('log', { type: 'stderr', text });
     });
 
-    this.process.on('close', (code, signal) => {
+    const handleExit = (code, signal, eventName) => {
+      if (!this.isRunning && !this.process) return;
       this.isRunning = false;
       this.isDetached = false;
-      const msg = `[Manager] Server process exited with code ${code} (${signal || 'clean'})\n`;
+      this.process = null;
+      this.detachedPid = null;
+      const msg = `[Manager] Server process ${eventName} with code ${code} (${signal || 'clean'})\n`;
       this._appendLog(msg);
       this.emit('log', { type: 'system', text: msg });
       this.emit('status-change', this.getStatus());
-      this.process = null;
-    });
+    };
+
+    this.process.on('close', (code, signal) => handleExit(code, signal, 'closed'));
+    this.process.on('exit', (code, signal) => handleExit(code, signal, 'exited'));
 
     this.process.on('error', (err) => {
       this.isRunning = false;
       this.isDetached = false;
+      this.process = null;
+      this.detachedPid = null;
       const msg = `[Manager] Failed to launch server: ${err.message}\n`;
       this._appendLog(msg);
       this.emit('log', { type: 'error', text: msg });
       this.emit('status-change', this.getStatus());
-      this.process = null;
     });
 
     return this.getStatus();
@@ -314,19 +351,17 @@ class ServerRunner extends EventEmitter {
   }
 
   /**
-   * Stop the server gracefully
+   * Stop the server gracefully with reliable fallback
    */
-  async stopServer(timeoutMs = 15000) {
-    if (!this.isRunning) {
-      return { success: true, message: 'Server was not running' };
-    }
+  async stopServer(timeoutMs = 4000) {
+    this._stopDetachedMonitor();
 
-    // If running in detached mode with PID
+    // 1. If running in detached mode with an external PID
     if (this.isDetached && this.detachedPid) {
-      this._stopDetachedMonitor();
-      this._appendLog(`[Manager] Stopping detached server process (PID ${this.detachedPid})...\n`);
+      const pidToKill = this.detachedPid;
+      this._appendLog(`[Manager] Stopping detached server process (PID ${pidToKill})...\n`);
       return new Promise((resolve) => {
-        exec(`taskkill /PID ${this.detachedPid} /T /F`, () => {
+        exec(`taskkill /PID ${pidToKill} /F /T`, () => {
           this.isRunning = false;
           this.isDetached = false;
           this.detachedPid = null;
@@ -336,8 +371,7 @@ class ServerRunner extends EventEmitter {
       });
     }
 
-    this._stopDetachedMonitor();
-
+    // 2. If running as managed integrated process
     if (this.process) {
       this._appendLog('[Manager] Stopping server gracefully (sending stop command)...\n');
       try {
@@ -346,24 +380,44 @@ class ServerRunner extends EventEmitter {
 
       const proc = this.process;
       return new Promise((resolve) => {
+        let finished = false;
+        const cleanup = (forced = false) => {
+          if (finished) return;
+          finished = true;
+          this.isRunning = false;
+          this.isDetached = false;
+          this.process = null;
+          this.detachedPid = null;
+          this.emit('status-change', this.getStatus());
+          resolve({ success: true, forced });
+        };
+
         const timer = setTimeout(() => {
-          if (this.isRunning && proc) {
-            this._appendLog('[Manager] Server did not stop in time; forcing termination...\n');
-            try {
-              proc.kill('SIGKILL');
-            } catch {}
+          if (proc && proc.pid) {
+            this._appendLog('[Manager] Graceful stop timed out; force terminating process...\n');
+            exec(`taskkill /PID ${proc.pid} /F /T`, () => cleanup(true));
+          } else {
+            cleanup(true);
           }
-          resolve({ success: true, forced: true });
         }, timeoutMs);
+
+        proc.once('exit', () => {
+          clearTimeout(timer);
+          cleanup(false);
+        });
 
         proc.once('close', () => {
           clearTimeout(timer);
-          resolve({ success: true, forced: false });
+          cleanup(false);
         });
       });
     }
 
+    // Fallback reset
     this.isRunning = false;
+    this.isDetached = false;
+    this.detachedPid = null;
+    this.process = null;
     this.emit('status-change', this.getStatus());
     return { success: true };
   }
