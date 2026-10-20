@@ -9,7 +9,7 @@
  * - OS Process Detection: Detects existing HytaleServer.jar instances running on the machine
  * - Graceful shutdown and execution of stdin commands
  */
-const { spawn, exec } = require('child_process');
+const { spawn, exec, execFile } = require('child_process');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { exists } = require('./util');
@@ -24,6 +24,7 @@ class ServerRunner extends EventEmitter {
     this.detachedPid = null;
     this.logs = [];
     this.maxLogLines = 2000;
+    this._detachedCheckInterval = null;
   }
 
   setServerDir(dir) {
@@ -43,36 +44,127 @@ class ServerRunner extends EventEmitter {
    * Check if an external or previously detached HytaleServer.jar process is running
    */
   async findRunningServerProcess() {
-    // If managed process is active
+    // If managed integrated process is active
     if (this.isRunning && this.process) {
       return { isRunning: true, pid: this.process.pid, managed: true };
     }
 
     return new Promise((resolve) => {
-      // Query Windows process table for HytaleServer.jar
-      const cmd = process.platform === 'win32'
-        ? 'powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"CommandLine LIKE \'%HytaleServer.jar%\'\\" | Select-Object -ExpandProperty ProcessId"'
-        : "pgrep -f 'HytaleServer.jar'";
+      // Query OS process table specifically for java processes running HytaleServer.jar
+      // IMPORTANT: Filter specifically by process executable name (java.exe / javaw.exe)
+      // so the querying shell (powershell.exe / cmd.exe) does not match its own commandline!
+      if (process.platform === 'win32') {
+        execFile(
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            "Get-CimInstance Win32_Process -Filter \"(Name = 'java.exe' OR Name = 'javaw.exe') AND CommandLine LIKE '%HytaleServer.jar%'\" | Select-Object -ExpandProperty ProcessId",
+          ],
+          (err, stdout) => {
+            if (err || !stdout || !stdout.trim()) {
+              if (!this.process) {
+                const wasRunning = this.isRunning;
+                this.isRunning = false;
+                this.isDetached = false;
+                this.detachedPid = null;
+                this._stopDetachedMonitor();
+                if (wasRunning) {
+                  this.emit('status-change', this.getStatus());
+                }
+              }
+              return resolve({ isRunning: false, pid: null, managed: false });
+            }
 
-      exec(cmd, (err, stdout) => {
-        if (err || !stdout || !stdout.trim()) {
-          this.detachedPid = null;
-          return resolve({ isRunning: false, pid: null, managed: false });
-        }
+            const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+            const pid = parseInt(lines[0], 10);
+            if (pid && !isNaN(pid)) {
+              const wasRunning = this.isRunning;
+              const prevPid = this.detachedPid;
+              this.isRunning = true;
+              this.isDetached = true;
+              this.detachedPid = pid;
+              this._startDetachedMonitor();
+              if (!wasRunning || prevPid !== pid) {
+                this.emit('status-change', this.getStatus());
+              }
+              return resolve({ isRunning: true, pid, managed: false });
+            }
 
-        const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
-        const pid = parseInt(lines[0], 10);
-        if (pid && !isNaN(pid)) {
-          this.isRunning = true;
-          this.isDetached = true;
-          this.detachedPid = pid;
-          this.emit('status-change', this.getStatus());
-          return resolve({ isRunning: true, pid, managed: false });
-        }
+            if (!this.process) {
+              this.isRunning = false;
+              this.isDetached = false;
+              this.detachedPid = null;
+              this._stopDetachedMonitor();
+              this.emit('status-change', this.getStatus());
+            }
+            resolve({ isRunning: false, pid: null, managed: false });
+          }
+        );
+      } else {
+        execFile('pgrep', ['-f', 'java.*HytaleServer\\.jar'], (err, stdout) => {
+          if (err || !stdout || !stdout.trim()) {
+            if (!this.process) {
+              const wasRunning = this.isRunning;
+              this.isRunning = false;
+              this.isDetached = false;
+              this.detachedPid = null;
+              this._stopDetachedMonitor();
+              if (wasRunning) {
+                this.emit('status-change', this.getStatus());
+              }
+            }
+            return resolve({ isRunning: false, pid: null, managed: false });
+          }
 
-        resolve({ isRunning: false, pid: null, managed: false });
-      });
+          const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+          const pid = parseInt(lines[0], 10);
+          if (pid && !isNaN(pid)) {
+            const wasRunning = this.isRunning;
+            const prevPid = this.detachedPid;
+            this.isRunning = true;
+            this.isDetached = true;
+            this.detachedPid = pid;
+            this._startDetachedMonitor();
+            if (!wasRunning || prevPid !== pid) {
+              this.emit('status-change', this.getStatus());
+            }
+            return resolve({ isRunning: true, pid, managed: false });
+          }
+
+          if (!this.process) {
+            this.isRunning = false;
+            this.isDetached = false;
+            this.detachedPid = null;
+            this._stopDetachedMonitor();
+            this.emit('status-change', this.getStatus());
+          }
+          resolve({ isRunning: false, pid: null, managed: false });
+        });
+      }
     });
+  }
+
+  _startDetachedMonitor() {
+    if (this._detachedCheckInterval) return;
+    this._detachedCheckInterval = setInterval(async () => {
+      if (!this.isRunning || !this.isDetached || this.process) {
+        this._stopDetachedMonitor();
+        return;
+      }
+      const st = await this.findRunningServerProcess();
+      if (!st.isRunning) {
+        this._stopDetachedMonitor();
+      }
+    }, 4000);
+  }
+
+  _stopDetachedMonitor() {
+    if (this._detachedCheckInterval) {
+      clearInterval(this._detachedCheckInterval);
+      this._detachedCheckInterval = null;
+    }
   }
 
   /**
@@ -231,6 +323,7 @@ class ServerRunner extends EventEmitter {
 
     // If running in detached mode with PID
     if (this.isDetached && this.detachedPid) {
+      this._stopDetachedMonitor();
       this._appendLog(`[Manager] Stopping detached server process (PID ${this.detachedPid})...\n`);
       return new Promise((resolve) => {
         exec(`taskkill /PID ${this.detachedPid} /T /F`, () => {
@@ -242,6 +335,8 @@ class ServerRunner extends EventEmitter {
         });
       });
     }
+
+    this._stopDetachedMonitor();
 
     if (this.process) {
       this._appendLog('[Manager] Stopping server gracefully (sending stop command)...\n');

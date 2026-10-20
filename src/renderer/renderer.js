@@ -1171,7 +1171,10 @@ function updateServerStatusUI(status) {
     quickServerBtn.className = 'btn btn-danger btn-sm';
     if (status.isDetached) {
       dashServerStatus.textContent = `Running (Independent Window - PID: ${status.pid})`;
-      if (detachedModeNotice) detachedModeNotice.classList.remove('hidden');
+      if (detachedModeNotice) {
+        detachedModeNotice.classList.remove('hidden');
+        detachedModeNotice.innerHTML = `<span>💡</span><span><strong>Detached Mode Running:</strong> Hytale Server is active in an independent terminal window (PID: ${status.pid}). You can safely close or exit the Manager anytime without stopping your server!</span>`;
+      }
       consoleInput.placeholder = 'Server is running in external console window. Use its terminal window for commands.';
       consoleInput.disabled = true;
     } else {
@@ -1187,7 +1190,12 @@ function updateServerStatusUI(status) {
     quickServerBtn.className = 'btn btn-primary btn-sm';
     dashServerStatus.textContent = 'Stopped';
     if (detachedModeNotice) {
-      detachedModeNotice.classList.toggle('hidden', consoleLaunchMode?.value !== 'detached');
+      if (consoleLaunchMode?.value === 'detached') {
+        detachedModeNotice.classList.remove('hidden');
+        detachedModeNotice.innerHTML = `<span>ℹ️</span><span><strong>Detached Mode Selected:</strong> When you start the server, it will open in a separate native terminal window, allowing you to close or exit the Manager without stopping your server.</span>`;
+      } else {
+        detachedModeNotice.classList.add('hidden');
+      }
     }
     consoleInput.placeholder = 'Type a server command (e.g. help, list, stop)...';
     consoleInput.disabled = false;
@@ -1228,7 +1236,7 @@ if (consoleLaunchMode) {
     const mode = consoleLaunchMode.value;
     if (settingsLaunchMode) settingsLaunchMode.value = mode;
     if (appConfig) appConfig.launchMode = mode;
-    if (detachedModeNotice) detachedModeNotice.classList.toggle('hidden', mode !== 'detached');
+    refreshServerStatus();
     window.api.saveConfig(appConfig);
   });
 }
@@ -1238,7 +1246,7 @@ if (settingsLaunchMode) {
     const mode = settingsLaunchMode.value;
     if (consoleLaunchMode) consoleLaunchMode.value = mode;
     if (appConfig) appConfig.launchMode = mode;
-    if (detachedModeNotice) detachedModeNotice.classList.toggle('hidden', mode !== 'detached');
+    refreshServerStatus();
   });
 }
 
