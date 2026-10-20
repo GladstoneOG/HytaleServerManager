@@ -127,18 +127,6 @@ async function createWindow() {
   // Check if an external or previously detached HytaleServer.jar is already running
   serverRunner.findRunningServerProcess().catch(() => {});
 
-  // Ensure desktop/start menu shortcuts exist on Windows
-  if (process.platform === 'win32') {
-    try {
-      const fs = require('fs');
-      const desktopShortcut = path.join(process.env.USERPROFILE || '', 'Desktop', 'Hytale Server Manager.lnk');
-      if (!fs.existsSync(desktopShortcut)) {
-        const { createShortcut } = require(path.join(__dirname, '..', '..', 'scripts', 'create-shortcut'));
-        createShortcut();
-      }
-    } catch {}
-  }
-
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
