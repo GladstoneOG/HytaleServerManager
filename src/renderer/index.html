@@ -3,591 +3,593 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hytale Server Mod Manager</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'">
+  <title>Hytale Server Manager</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-layout">
-    <!-- Sidebar -->
+  <!-- ============ ICON SPRITE (Lucide-style, inline for zero network cost) ============ -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="i-overview" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+    <symbol id="i-console" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></symbol>
+    <symbol id="i-library" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></symbol>
+    <symbol id="i-browse" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></symbol>
+    <symbol id="i-profiles" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7.5"/><path d="m20.5 20.5-4.2-4.2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-update" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6Z"/><path d="M19 17v4"/><path d="M17 19h4"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-enter" viewBox="0 0 24 24"><path d="m9 10-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></symbol>
+    <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+  </svg>
+
+  <div class="app" id="app">
+    <!-- ================================ SIDEBAR ================================ -->
     <aside class="sidebar">
-      <div class="sidebar-header">
-        <div class="brand">
-          <div class="brand-logo"><img src="../assets/icon.png" width="28" height="28" alt="Logo" style="border-radius: 6px; display: block;"></div>
-          <div class="brand-info">
-            <span class="brand-title">Hytale Server</span>
-            <span class="brand-subtitle">Mod Manager & Updater</span>
-          </div>
-        </div>
-        <div class="server-badge-container">
-          <span id="sidebar-server-badge" class="badge badge-offline">Server Offline</span>
+      <div class="brand drag">
+        <img class="brand-mark" src="../assets/icon.png" width="26" height="26" alt="">
+        <div class="brand-text">
+          <span class="brand-name">Hytale Server</span>
+          <span class="brand-sub">Manager</span>
         </div>
       </div>
 
-      <nav class="sidebar-nav">
-        <button class="nav-item active" data-tab="dashboard">
-          <span class="icon">📊</span>
-          <span class="label">Dashboard</span>
+      <nav class="nav" aria-label="Main">
+        <div class="nav-group-label">Server</div>
+        <button class="nav-item active" data-tab="overview" title="Overview (Ctrl+1)">
+          <svg class="ic"><use href="#i-overview"/></svg><span>Overview</span>
         </button>
-        <button class="nav-item" data-tab="installed-mods">
-          <span class="icon">📦</span>
-          <span class="label">Installed Mods</span>
-          <span id="installed-mods-count" class="counter-pill">0</span>
+        <button class="nav-item" data-tab="console" title="Console (Ctrl+2)">
+          <svg class="ic"><use href="#i-console"/></svg><span>Console</span>
+          <span class="nav-live-dot" aria-hidden="true"></span>
         </button>
-        <button class="nav-item" data-tab="curseforge">
-          <span class="icon">🔨</span>
-          <span class="label">CurseForge</span>
+
+        <div class="nav-group-label">Mods</div>
+        <button class="nav-item" data-tab="library" title="Library (Ctrl+3)">
+          <svg class="ic"><use href="#i-library"/></svg><span>Library</span>
+          <span id="nav-mods-count" class="nav-count">0</span>
         </button>
-        <button class="nav-item" data-tab="thunderstore">
-          <span class="icon">⚡</span>
-          <span class="label">Thunderstore</span>
+        <button class="nav-item" data-tab="browse" title="Browse (Ctrl+4)">
+          <svg class="ic"><use href="#i-browse"/></svg><span>Browse</span>
         </button>
-        <button class="nav-item" data-tab="profiles">
-          <span class="icon">📑</span>
-          <span class="label">Profiles</span>
-        </button>
-        <button class="nav-item" data-tab="console">
-          <span class="icon">💻</span>
-          <span class="label">Server Console</span>
-        </button>
-        <button class="nav-item" data-tab="settings">
-          <span class="icon">⚙️</span>
-          <span class="label">Settings & Auth</span>
+        <button class="nav-item" data-tab="profiles" title="Profiles (Ctrl+5)">
+          <svg class="ic"><use href="#i-profiles"/></svg><span>Profiles</span>
         </button>
       </nav>
 
-      <div class="sidebar-footer">
-        <div class="account-pill" id="sidebar-account-pill">
-          <span class="account-dot dot-gray"></span>
-          <span class="account-name" id="sidebar-account-text">Checking Auth...</span>
-        </div>
+      <div class="sidebar-foot">
+        <button class="nav-item" data-tab="settings" title="Settings (Ctrl+,)">
+          <svg class="ic"><use href="#i-settings"/></svg><span>Settings</span>
+        </button>
+        <button id="sidebar-account" class="account-chip" title="Hytale account">
+          <span class="avatar"><svg class="ic"><use href="#i-user"/></svg></span>
+          <span class="account-text">
+            <span class="account-title">Hytale account</span>
+            <span class="account-status"><span id="sidebar-account-dot" class="dot dot-muted"></span><span id="sidebar-account-text">Checking…</span></span>
+          </span>
+        </button>
       </div>
     </aside>
 
-    <!-- Main Content Area -->
-    <main class="main-content">
-      <!-- Top Global Bar -->
-      <header class="top-bar">
-        <div class="top-bar-left">
-          <h1 id="page-title">Dashboard</h1>
-        </div>
-        <div class="top-bar-right">
-          <button id="btn-topbar-install-wizard" class="btn btn-accent btn-sm" title="Initialize a new Hytale Server">
-            ✨ Setup New Server
-          </button>
-          <div class="quick-server-control">
-            <button id="quick-server-btn" class="btn btn-primary btn-sm">▶ Start Server</button>
+    <!-- ================================ MAIN ================================ -->
+    <main class="main">
+      <header class="topbar drag">
+        <h1 id="page-title" class="page-title">Overview</h1>
+        <div class="topbar-actions no-drag">
+          <div id="topbar-status" class="status-pill is-offline" role="status">
+            <span class="status-dot"></span><span id="topbar-status-text">Stopped</span>
           </div>
-          <button id="open-server-folder-btn" class="btn btn-secondary btn-sm" title="Open Server Folder">
-            📁 Open Folder
+          <button id="quick-server-btn" class="btn btn-primary btn-sm server-toggle">
+            <svg class="ic"><use href="#i-play"/></svg><span>Start</span>
           </button>
         </div>
       </header>
 
-      <!-- Toast Notification Container -->
-      <div id="toast-container" class="toast-container"></div>
-
-      <!-- Tab Content Area -->
-      <div class="content-body">
-
-        <!-- ================= DASHBOARD TAB ================= -->
-        <section id="tab-dashboard" class="tab-pane active">
-          <!-- Setup / Not Installed Banner (Conditional) -->
-          <div id="server-not-installed-banner" class="banner banner-install hidden">
-            <div class="banner-icon">✨</div>
-            <div class="banner-content">
-              <h3>No Hytale Server Detected In This Folder</h3>
-              <p>Your server directory does not have <code>HytaleServer.jar</code> installed yet. Set up a fresh server in seconds with our installation wizard.</p>
-            </div>
-            <div class="banner-actions">
-              <button id="btn-open-install-wizard-dash" class="btn btn-primary">Initialize Server Now</button>
-            </div>
-          </div>
-
-          <!-- Update Banner (Conditional) -->
-          <div id="server-update-banner" class="banner banner-update hidden">
-            <div class="banner-icon">🚀</div>
-            <div class="banner-content">
-              <h3>Hytale Server Update Available!</h3>
-              <p id="update-banner-desc">A new server version (<strong id="target-version-tag">0.7.2</strong>) is ready to install.</p>
-              <div id="update-progress-container" class="progress-wrap hidden">
-                <div class="progress-bar">
-                  <div id="update-progress-fill" class="progress-fill" style="width: 0%"></div>
-                </div>
-                <div id="update-progress-text" class="progress-status-text">Preparing update...</div>
+      <div class="content">
+        <!-- ============================ OVERVIEW ============================ -->
+        <section id="tab-overview" class="page active" aria-label="Overview">
+          <div class="page-inner">
+            <div id="server-not-installed-banner" class="callout callout-accent hidden">
+              <div class="callout-icon"><svg class="ic"><use href="#i-sparkle"/></svg></div>
+              <div class="callout-body">
+                <div class="callout-title">No server in this folder</div>
+                <div class="callout-text">Set up a new server here, or point the app to an existing one.</div>
               </div>
-            </div>
-            <div class="banner-actions">
-              <button id="btn-update-server-now" class="btn btn-accent">One-Click Update Now</button>
-            </div>
-          </div>
-
-          <div class="grid-2-col">
-            <!-- Server Status Card -->
-            <div class="card">
-              <div class="card-header">
-                <h3>🖥️ Server Overview</h3>
-                <span id="dash-version-badge" class="badge badge-info">v0.7.1</span>
-              </div>
-              <div class="card-body">
-                <div class="info-row">
-                  <span class="info-label">Server Folder:</span>
-                  <span class="info-value code" id="dash-server-dir">F:\serverht\Server</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Current Version:</span>
-                  <span class="info-value" id="dash-installed-ver">Detecting...</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Upstream Latest:</span>
-                  <span class="info-value" id="dash-upstream-ver">Checking...</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Active Profile:</span>
-                  <span class="info-value" id="dash-active-profile">Default</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Server Status:</span>
-                  <span class="info-value" id="dash-server-status">Stopped</span>
-                </div>
-
-                <div class="card-actions-row">
-                  <button id="btn-check-updates" class="btn btn-secondary btn-sm">🔄 Check Version</button>
-                  <button id="btn-dash-open-mods" class="btn btn-secondary btn-sm">📦 View Mods</button>
-                </div>
+              <div class="callout-actions">
+                <button id="btn-change-folder-dash" class="btn btn-ghost btn-sm">Choose folder</button>
+                <button id="btn-open-install-wizard-dash" class="btn btn-primary btn-sm">Set up server</button>
               </div>
             </div>
 
-            <!-- Hytale Account / Downloader Card -->
-            <div class="card">
-              <div class="card-header">
-                <h3>🔑 Hytale Account Connection</h3>
-                <span id="dash-auth-status-badge" class="badge badge-warning">Unlinked</span>
-              </div>
-              <div class="card-body">
-                <p class="card-desc">
-                  Connect your Hytale account to enable seamless 1-click automatic server updates without using the command-line downloader.
-                </p>
-                <div class="info-row">
-                  <span class="info-label">Credentials File:</span>
-                  <span class="info-value code" id="dash-creds-file">Searching...</span>
+            <!-- Hero -->
+            <div class="hero card">
+              <div class="hero-main">
+                <div class="hero-status">
+                  <span id="hero-dot" class="hero-dot"></span>
+                  <div>
+                    <div id="hero-label" class="hero-label">Offline</div>
+                    <div id="hero-sub" class="hero-sub">Server is not running</div>
+                  </div>
                 </div>
-                <div class="info-row">
-                  <span class="info-label">Branch / Patchline:</span>
-                  <span class="info-value" id="dash-creds-branch">release</span>
-                </div>
-
-                <div class="card-actions-row">
-                  <button id="btn-dash-login-hytale" class="btn btn-primary btn-sm">🔗 Connect Hytale Account</button>
-                  <button id="btn-dash-refresh-auth" class="btn btn-secondary btn-sm">🔄 Refresh Auth</button>
+                <div class="hero-actions">
+                  <button id="hero-folder-btn" class="btn btn-ghost" title="Open server folder">
+                    <svg class="ic"><use href="#i-folder"/></svg><span>Folder</span>
+                  </button>
+                  <button id="hero-console-btn" class="btn btn-ghost">
+                    <svg class="ic"><use href="#i-console"/></svg><span>Console</span>
+                  </button>
+                  <button id="hero-server-btn" class="btn btn-primary server-toggle">
+                    <svg class="ic"><use href="#i-play"/></svg><span>Start</span>
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Mod Stats Overview -->
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-val" id="stat-total-mods">0</div>
-              <div class="stat-lbl">Installed Mods</div>
+              <div id="server-update-banner" class="hero-update hidden">
+                <svg class="ic ic-accent"><use href="#i-update"/></svg>
+                <div class="hero-update-text">
+                  <strong>Version <span id="target-version-tag">—</span> is available</strong>
+                  <div id="update-progress-container" class="progress hidden">
+                    <div class="progress-track"><div id="update-progress-fill" class="progress-fill"></div></div>
+                    <span id="update-progress-text" class="progress-label">Preparing…</span>
+                  </div>
+                </div>
+                <button id="btn-update-server-now" class="btn btn-primary btn-sm">Update</button>
+              </div>
             </div>
-            <div class="stat-card">
-              <div class="stat-val text-success" id="stat-enabled-mods">0</div>
-              <div class="stat-lbl">Active & Enabled</div>
+
+            <!-- Stats -->
+            <div class="stats">
+              <button class="stat" data-goto="library" data-filter="all">
+                <span class="stat-label">Mods</span>
+                <span id="stat-total-mods" class="stat-value">–</span>
+              </button>
+              <button class="stat" data-goto="library" data-filter="enabled">
+                <span class="stat-label">Enabled</span>
+                <span id="stat-enabled-mods" class="stat-value">–</span>
+              </button>
+              <button class="stat" data-goto="library" data-filter="updates">
+                <span class="stat-label">Updates</span>
+                <span id="stat-updates-mods" class="stat-value">–</span>
+              </button>
+              <button class="stat" data-goto="profiles">
+                <span class="stat-label">Profiles</span>
+                <span id="stat-active-profiles" class="stat-value">–</span>
+              </button>
             </div>
-            <div class="stat-card">
-              <div class="stat-val text-warning" id="stat-updates-mods">0</div>
-              <div class="stat-lbl">Updates Available</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-val" id="stat-active-profiles">1</div>
-              <div class="stat-lbl">Profiles Configured</div>
+
+            <div class="grid-2">
+              <div class="card">
+                <div class="card-head">
+                  <h2 class="card-title">Server</h2>
+                  <button id="btn-check-updates" class="icon-btn" title="Check for updates" aria-label="Check for updates">
+                    <svg class="ic"><use href="#i-refresh"/></svg>
+                  </button>
+                </div>
+                <dl class="kv">
+                  <div><dt>Version</dt><dd id="dash-installed-ver"><span class="skeleton-text"></span></dd></div>
+                  <div><dt>Latest</dt><dd id="dash-upstream-ver"><span class="skeleton-text"></span></dd></div>
+                  <div><dt>Profile</dt><dd id="dash-active-profile">Default</dd></div>
+                  <div><dt>Folder</dt><dd><button id="dash-server-dir" class="link-btn mono truncate" title="Open folder">—</button></dd></div>
+                </dl>
+              </div>
+
+              <div class="card">
+                <div class="card-head">
+                  <h2 class="card-title">Hytale account</h2>
+                  <span id="dash-auth-status-badge" class="tag">Checking…</span>
+                </div>
+                <p id="dash-auth-desc" class="card-text">Sign in to download server updates directly from Hytale.</p>
+                <div class="card-actions">
+                  <button id="btn-dash-login-hytale" class="btn btn-secondary btn-sm">
+                    <svg class="ic"><use href="#i-link"/></svg><span>Sign in</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <!-- ================= INSTALLED MODS TAB ================= -->
-        <section id="tab-installed-mods" class="tab-pane">
-          <div class="toolbar">
-            <div class="toolbar-search">
-              <input type="text" id="mods-search-input" class="input-text" placeholder="Search installed mods...">
-            </div>
-            <div class="toolbar-filters">
-              <select id="mods-filter-status" class="input-select">
-                <option value="all">All Mods</option>
-                <option value="enabled">Enabled Only</option>
-                <option value="disabled">Disabled Only</option>
-                <option value="updates">Updates Available</option>
-              </select>
-            </div>
-            <div class="toolbar-actions">
-              <button id="btn-update-all-mods" class="btn btn-accent btn-sm hidden">⚡ Update All</button>
-              <button id="btn-refresh-installed-mods" class="btn btn-secondary btn-sm">🔄 Refresh</button>
-              <button id="btn-open-mods-folder" class="btn btn-secondary btn-sm">📁 Mods Folder</button>
-            </div>
-          </div>
-
-          <div id="installed-mods-list" class="mods-list">
-            <div class="empty-state">
-              <div class="empty-icon">⏳</div>
-              <p>Scanning installed mods in Server/mods...</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- ================= CURSEFORGE BROWSER TAB ================= -->
-        <section id="tab-curseforge" class="tab-pane">
-          <div class="toolbar">
-            <div class="toolbar-search">
-              <input type="text" id="cf-search-input" class="input-text" placeholder="Search CurseForge Hytale mods...">
-            </div>
-            <div class="toolbar-filters">
-              <select id="cf-category-select" class="input-select">
-                <option value="">All Categories</option>
-              </select>
-              <select id="cf-sort-select" class="input-select">
-                <option value="2">Most Popular</option>
-                <option value="5">Total Downloads</option>
-                <option value="3">Recently Updated</option>
-                <option value="1">Featured</option>
-                <option value="4">Name</option>
-              </select>
-            </div>
-            <div class="toolbar-actions">
-              <button id="btn-cf-search" class="btn btn-primary btn-sm">🔍 Search</button>
-            </div>
-          </div>
-
-          <div id="cf-results-grid" class="mods-grid">
-            <div class="empty-state">
-              <div class="empty-icon">🔨</div>
-              <p>Loading CurseForge mods for Hytale...</p>
-            </div>
-          </div>
-
-          <div class="pagination-bar" id="cf-pagination">
-            <button id="cf-prev-page" class="btn btn-secondary btn-sm" disabled>« Previous</button>
-            <span id="cf-page-info">Page 1</span>
-            <button id="cf-next-page" class="btn btn-secondary btn-sm">Next »</button>
-          </div>
-        </section>
-
-        <!-- ================= THUNDERSTORE BROWSER TAB ================= -->
-        <section id="tab-thunderstore" class="tab-pane">
-          <div class="toolbar">
-            <div class="toolbar-search">
-              <input type="text" id="ts-search-input" class="input-text" placeholder="Search Thunderstore Hytale packages...">
-            </div>
-            <div class="toolbar-filters">
-              <select id="ts-sort-select" class="input-select">
-                <option value="downloads">Most Downloads</option>
-                <option value="updated">Recently Updated</option>
-                <option value="name">Name</option>
-              </select>
-            </div>
-            <div class="toolbar-actions">
-              <button id="btn-ts-search" class="btn btn-primary btn-sm">🔍 Search</button>
-              <button id="btn-ts-refresh" class="btn btn-secondary btn-sm">🔄 Refresh</button>
-            </div>
-          </div>
-
-          <div id="ts-results-grid" class="mods-grid">
-            <div class="empty-state">
-              <div class="empty-icon">⚡</div>
-              <p>Loading Thunderstore Hytale packages...</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- ================= PROFILES TAB ================= -->
-        <section id="tab-profiles" class="tab-pane">
-          <div class="toolbar">
-            <div class="toolbar-actions">
-              <button id="btn-create-profile" class="btn btn-primary btn-sm">+ New Profile from Current</button>
-              <button id="btn-import-profile" class="btn btn-secondary btn-sm">📥 Import Profile JSON</button>
-            </div>
-          </div>
-
-          <div id="profiles-list" class="profiles-grid">
-            <!-- Dynamic profiles -->
-          </div>
-        </section>
-
-        <!-- ================= SERVER CONSOLE TAB ================= -->
-        <section id="tab-console" class="tab-pane">
-          <div class="console-wrapper">
-            <div class="console-header">
-              <div class="console-title">
-                <span id="console-status-dot" class="console-dot dot-gray"></span>
-                <span>Server Output & Control</span>
-                <span id="console-status-badge" class="badge badge-offline" style="margin-left: 8px; font-size: 11px;">Offline</span>
+        <!-- ============================ CONSOLE ============================ -->
+        <section id="tab-console" class="page page-fill" aria-label="Console">
+          <div class="terminal">
+            <div class="terminal-head">
+              <div class="terminal-title">
+                <span id="console-status-badge" class="tag">Offline</span>
               </div>
-              <div class="console-actions">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                  <label for="console-launch-mode" style="font-size: 12px; color: var(--text-muted);">Mode:</label>
-                  <select id="console-launch-mode" class="input-select" style="padding: 3px 8px; font-size: 12px; height: 28px; width: auto;">
-                    <option value="integrated">Integrated (Live UI Logs)</option>
-                    <option value="detached">Detached (Independent Window)</option>
-                  </select>
+              <div class="terminal-tools">
+                <div class="segmented segmented-sm" id="console-launch-mode" role="radiogroup" aria-label="Run mode">
+                  <button data-value="integrated" role="radio" title="Logs and commands inside this app">In app</button>
+                  <button data-value="detached" role="radio" title="Opens its own window — you can close this app safely">Separate window</button>
                 </div>
-                <label class="checkbox-label" style="margin-left: 10px;">
-                  <input type="checkbox" id="console-autoscroll" checked> Auto-Scroll
-                </label>
-                <button id="btn-clear-console" class="btn btn-secondary btn-xs" style="margin-left: 10px;">Clear Output</button>
+                <button id="btn-clear-console" class="icon-btn" title="Clear output" aria-label="Clear output">
+                  <svg class="ic"><use href="#i-eraser"/></svg>
+                </button>
               </div>
             </div>
 
-            <!-- Detached Mode Notice Banner -->
-            <div id="detached-mode-notice" class="detached-notice-banner hidden" style="padding: 8px 16px; background: rgba(59, 130, 246, 0.15); border-bottom: 1px solid rgba(59, 130, 246, 0.3); font-size: 12.5px; color: #93c5fd; display: flex; align-items: center; gap: 8px;">
-              <span>💡</span>
-              <span><strong>Detached Mode Active:</strong> Hytale Server runs in an independent terminal window. You can freely close or exit the Manager anytime without stopping your server!</span>
+            <div id="detached-mode-notice" class="terminal-notice hidden">
+              <svg class="ic"><use href="#i-info"/></svg><span id="detached-mode-text"></span>
             </div>
 
-            <div id="console-output" class="console-output">
-              <div class="console-line system">[Manager] Ready. Start the server using the button above to begin streaming logs.</div>
+            <div class="terminal-body">
+              <div id="console-output" class="terminal-output" role="log" aria-live="off">
+                <div class="log-line system">Ready. Press Start to launch the server.</div>
+              </div>
+              <button id="console-jump" class="jump-btn hidden" title="Jump to latest">
+                <svg class="ic"><use href="#i-arrow-down"/></svg><span>Latest</span>
+              </button>
             </div>
 
-            <form id="console-input-form" class="console-input-bar">
-              <span class="console-prompt">&gt;</span>
-              <input type="text" id="console-input" class="console-text-input" placeholder="Type a server command (e.g. help, list, stop)..." autocomplete="off">
-              <button type="submit" class="btn btn-primary btn-sm">Send</button>
+            <form id="console-input-form" class="terminal-input">
+              <span class="prompt">›</span>
+              <input type="text" id="console-input" placeholder="Type a command — try help or list" autocomplete="off" spellcheck="false">
+              <kbd class="kbd" aria-hidden="true"><svg class="ic"><use href="#i-enter"/></svg></kbd>
             </form>
           </div>
         </section>
 
-        <!-- ================= SETTINGS & AUTH TAB ================= -->
-        <section id="tab-settings" class="tab-pane">
-          <div class="card max-w-700">
-            <div class="card-header">
-              <h3>⚙️ Server Configuration</h3>
-            </div>
-            <div class="card-body">
-              <div class="form-group">
-                <label>Hytale Server Directory</label>
-                <div class="input-with-button">
-                  <input type="text" id="settings-server-dir" class="input-text" readonly value="F:\serverht\Server">
-                  <button id="btn-browse-server-dir" class="btn btn-secondary">Browse...</button>
-                </div>
-                <small class="form-help">Points to the directory containing <code>HytaleServer.jar</code> and <code>mods/</code>.</small>
+        <!-- ============================ LIBRARY ============================ -->
+        <section id="tab-library" class="page" aria-label="Library">
+          <div class="page-inner">
+            <div class="toolbar">
+              <label class="search">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <input type="search" id="mods-search-input" placeholder="Search your mods" data-page-search>
+              </label>
+              <div class="segmented" id="mods-filter" role="radiogroup" aria-label="Filter">
+                <button data-value="all" class="active">All <span class="seg-count" data-count="all"></span></button>
+                <button data-value="enabled">Enabled <span class="seg-count" data-count="enabled"></span></button>
+                <button data-value="disabled">Disabled <span class="seg-count" data-count="disabled"></span></button>
+                <button data-value="updates">Updates <span class="seg-count" data-count="updates"></span></button>
               </div>
-
-              <div class="form-group">
-                <label>Default Server Launch Mode</label>
-                <select id="settings-launch-mode" class="input-select">
-                  <option value="integrated">Integrated Mode (Live log streaming & command prompt inside this window)</option>
-                  <option value="detached">Detached / Independent Mode (Opens separate native terminal window; safe to close/exit manager)</option>
-                </select>
-                <small class="form-help">Detached Mode runs Hytale in its own native command prompt window unlinked from Electron. You can close or exit the manager completely while keeping the game server running with 0% manager CPU usage.</small>
-              </div>
-
-              <div class="form-group">
-                <label>Server Memory Allocation (JVM Max Heap -Xmx)</label>
-                <select id="settings-max-ram" class="input-select">
-                  <option value="4G">4 GB (-Xmx4G)</option>
-                  <option value="6G" selected>6 GB (-Xmx6G - Recommended)</option>
-                  <option value="8G">8 GB (-Xmx8G - Large servers / heavy mods)</option>
-                  <option value="12G">12 GB (-Xmx12G)</option>
-                  <option value="16G">16 GB (-Xmx16G)</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label>Background & System Tray Behavior</label>
-                <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 6px; cursor: pointer;">
-                  <input type="checkbox" id="settings-close-to-tray" checked>
-                  <span>Minimize to System Tray on window close (Ultra-low 0.0% CPU background mode)</span>
-                </label>
-                <small class="form-help">When minimized to tray, window rendering is suspended and background timers throttle down to 0.0% CPU and ~30-50MB RAM.</small>
-              </div>
-
-              <div class="form-group">
-                <label>Update Patchline</label>
-                <select id="settings-patchline" class="input-select">
-                  <option value="release">release (Standard)</option>
-                  <option value="pre-release">pre-release (Beta / Snapshot)</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label>CurseForge API Key (Optional)</label>
-                <input type="password" id="settings-cf-api-key" class="input-text" placeholder="Leave empty to use built-in proxy (Recommended)">
-                <small class="form-help">Our built-in proxy handles Hytale CurseForge searches without an API key. You can provide your own key if desired.</small>
-              </div>
-
-              <div class="card-actions-row">
-                <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+              <div class="toolbar-end">
+                <button id="btn-update-all-mods" class="btn btn-primary btn-sm hidden">
+                  <svg class="ic"><use href="#i-update"/></svg><span>Update all</span>
+                </button>
+                <button id="btn-refresh-installed-mods" class="icon-btn" title="Check for updates" aria-label="Check for updates">
+                  <svg class="ic"><use href="#i-refresh"/></svg>
+                </button>
+                <button id="btn-open-mods-folder" class="icon-btn" title="Open mods folder" aria-label="Open mods folder">
+                  <svg class="ic"><use href="#i-folder"/></svg>
+                </button>
               </div>
             </div>
+
+            <div id="installed-mods-list" class="list"></div>
           </div>
+        </section>
 
-          <div class="card max-w-700 mt-20">
-            <div class="card-header">
-              <h3>🔑 Hytale Account Authentication</h3>
+        <!-- ============================ BROWSE ============================ -->
+        <section id="tab-browse" class="page" aria-label="Browse">
+          <div class="page-inner">
+            <div class="toolbar">
+              <div class="segmented" id="browse-source" role="tablist" aria-label="Source">
+                <button data-value="curseforge" class="active" role="tab">CurseForge</button>
+                <button data-value="thunderstore" role="tab">Thunderstore</button>
+              </div>
+              <label class="search">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <input type="search" id="browse-search-input" placeholder="Search mods" data-page-search>
+              </label>
+              <select id="cf-category-select" class="select" aria-label="Category">
+                <option value="">All categories</option>
+              </select>
+              <select id="cf-sort-select" class="select" aria-label="Sort">
+                <option value="2">Popular</option>
+                <option value="5">Most downloaded</option>
+                <option value="3">Recently updated</option>
+                <option value="1">Featured</option>
+                <option value="4">Name</option>
+              </select>
+              <select id="ts-sort-select" class="select hidden" aria-label="Sort">
+                <option value="downloads">Most downloaded</option>
+                <option value="updated">Recently updated</option>
+                <option value="name">Name</option>
+              </select>
             </div>
-            <div class="card-body">
-              <div id="device-login-display" class="hidden login-box">
-                <h4>Device Code Authorization</h4>
-                <p>Please authorize this application using the code below:</p>
-                <div class="user-code-display" id="login-user-code">--------</div>
-                <p class="login-subtext">A browser window has opened to approve this device code. If not, click below:</p>
-                <div class="card-actions-row">
-                  <button id="btn-open-verify-url" class="btn btn-accent btn-sm">🌐 Open Verification Page</button>
-                  <button id="btn-cancel-login" class="btn btn-secondary btn-sm">Cancel</button>
-                </div>
-                <div class="polling-indicator">
-                  <span class="spinner"></span> Waiting for browser approval...
-                </div>
-              </div>
 
-              <div id="auth-info-display">
-                <p class="card-desc">
-                  This tool connects to Hytale's official OAuth service via standard Device Code flow. Your tokens are stored securely in <code>.hytale-downloader-credentials.json</code>.
-                </p>
-                <button id="btn-trigger-device-login" class="btn btn-primary">Connect Hytale Account</button>
+            <div id="browse-cf">
+              <div id="cf-results-grid" class="card-grid"></div>
+              <div class="pager" id="cf-pagination">
+                <button id="cf-prev-page" class="icon-btn" disabled aria-label="Previous page"><svg class="ic"><use href="#i-chevron-left"/></svg></button>
+                <span id="cf-page-info" class="pager-info">Page 1</span>
+                <button id="cf-next-page" class="icon-btn" aria-label="Next page"><svg class="ic"><use href="#i-chevron-right"/></svg></button>
               </div>
+            </div>
+            <div id="browse-ts" class="hidden">
+              <div id="ts-results-grid" class="card-grid"></div>
             </div>
           </div>
         </section>
 
+        <!-- ============================ PROFILES ============================ -->
+        <section id="tab-profiles" class="page" aria-label="Profiles">
+          <div class="page-inner">
+            <div class="page-intro">
+              <p class="muted">Save your current mod set and switch between setups in one click.</p>
+              <div class="toolbar-end">
+                <button id="btn-import-profile" class="btn btn-ghost btn-sm">
+                  <svg class="ic"><use href="#i-upload"/></svg><span>Import</span>
+                </button>
+                <button id="btn-create-profile" class="btn btn-primary btn-sm">
+                  <svg class="ic"><use href="#i-plus"/></svg><span>New profile</span>
+                </button>
+              </div>
+            </div>
+            <div id="profiles-list" class="card-grid card-grid-wide"></div>
+          </div>
+        </section>
+
+        <!-- ============================ SETTINGS ============================ -->
+        <section id="tab-settings" class="page" aria-label="Settings">
+          <div class="page-inner page-narrow">
+            <div class="settings-group">
+              <h2 class="settings-title">Server</h2>
+              <div class="settings-card">
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Server folder</div>
+                    <div id="settings-server-dir" class="setting-desc mono truncate">—</div>
+                  </div>
+                  <div class="setting-control">
+                    <button id="btn-settings-setup" class="btn btn-ghost btn-sm">Set up new…</button>
+                    <button id="btn-browse-server-dir" class="btn btn-secondary btn-sm">Change</button>
+                  </div>
+                </div>
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Memory</div>
+                    <div class="setting-desc">Maximum RAM the server may use.</div>
+                  </div>
+                  <div class="setting-control">
+                    <select id="settings-max-ram" class="select">
+                      <option value="4G">4 GB</option>
+                      <option value="6G">6 GB · recommended</option>
+                      <option value="8G">8 GB</option>
+                      <option value="12G">12 GB</option>
+                      <option value="16G">16 GB</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Run server</div>
+                    <div class="setting-desc">A separate window keeps the server running after you quit this app.</div>
+                  </div>
+                  <div class="setting-control">
+                    <div class="segmented segmented-sm" id="settings-launch-mode" role="radiogroup" aria-label="Run server">
+                      <button data-value="integrated" role="radio">In app</button>
+                      <button data-value="detached" role="radio">Separate window</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Update channel</div>
+                    <div class="setting-desc">Pre-release gets new builds sooner but may be unstable.</div>
+                  </div>
+                  <div class="setting-control">
+                    <select id="settings-patchline" class="select">
+                      <option value="release">Release</option>
+                      <option value="pre-release">Pre-release</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <h2 class="settings-title">App</h2>
+              <div class="settings-card">
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Close to tray</div>
+                    <div class="setting-desc">Keep running in the background with near-zero CPU use.</div>
+                  </div>
+                  <div class="setting-control">
+                    <label class="switch"><input type="checkbox" id="settings-close-to-tray"><span class="switch-track"></span></label>
+                  </div>
+                </div>
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Launch at login</div>
+                    <div class="setting-desc">Start minimized in the tray when you sign in to Windows.</div>
+                  </div>
+                  <div class="setting-control">
+                    <label class="switch"><input type="checkbox" id="settings-login-item"><span class="switch-track"></span></label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <h2 class="settings-title">Account</h2>
+              <div class="settings-card">
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Hytale account</div>
+                    <div id="settings-account-desc" class="setting-desc">Used to download server updates.</div>
+                  </div>
+                  <div class="setting-control">
+                    <button id="btn-trigger-device-login" class="btn btn-secondary btn-sm">Sign in</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <h2 class="settings-title">Advanced</h2>
+              <div class="settings-card">
+                <div class="setting setting-stack">
+                  <div class="setting-text">
+                    <div class="setting-label">CurseForge API key</div>
+                    <div class="setting-desc">Optional. Leave empty to use the built-in proxy.</div>
+                  </div>
+                  <input type="password" id="settings-cf-api-key" class="input" placeholder="Not set" autocomplete="off" spellcheck="false">
+                </div>
+              </div>
+            </div>
+            <p class="settings-foot muted">Changes are saved automatically.</p>
+          </div>
+        </section>
       </div>
     </main>
   </div>
 
-  <!-- Server Installation Wizard Modal -->
-  <div id="install-modal" class="modal-overlay hidden">
-    <div class="modal-window modal-wide">
-      <div class="modal-header">
-        <h3>✨ Hytale Server Installation & Provisioning Wizard</h3>
-        <button id="modal-install-close-btn" class="modal-close">&times;</button>
+  <div id="toast-container" class="toasts" aria-live="polite"></div>
+
+  <!-- ============================ SETUP WIZARD ============================ -->
+  <div id="install-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="install-title">
+    <div class="modal-panel modal-lg">
+      <div class="modal-head">
+        <div>
+          <h3 id="install-title" class="modal-title">Set up a server</h3>
+          <p class="modal-sub">Creates a ready-to-run Hytale server with default settings.</p>
+        </div>
+        <button id="modal-install-close-btn" class="icon-btn" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
       <div class="modal-body">
-        <p class="modal-lead">
-          Set up a fresh Hytale Dedicated Server following the official <strong>Hytale Server Manual</strong> specifications.
-        </p>
+        <div id="wizard-java-status" class="inline-note">
+          <span id="wizard-java-dot" class="dot dot-muted"></span>
+          <span id="wizard-java-text">Checking Java…</span>
+        </div>
 
-        <!-- Java Environment Notice -->
-        <div id="wizard-java-status" class="status-box status-info">
-          <span class="icon">☕</span>
-          <div class="status-text">
-            <strong>Java Environment:</strong> <span id="wizard-java-text">Checking Java...</span>
+        <div class="field">
+          <span class="field-label">Location</span>
+          <div class="input-group">
+            <input type="text" id="wizard-target-dir" class="input mono" value="">
+            <button id="wizard-btn-browse-dir" class="btn btn-secondary btn-sm" type="button">Browse</button>
           </div>
         </div>
 
-        <div class="wizard-steps-container">
-          <!-- Step 1: Destination -->
-          <div class="form-group mt-16">
-            <label>1. Target Server Installation Directory</label>
-            <div class="input-with-button">
-              <input type="text" id="wizard-target-dir" class="input-text" value="F:\serverht\Server">
-              <button id="wizard-btn-browse-dir" class="btn btn-secondary">Browse...</button>
-            </div>
-            <small class="form-help">Where your <code>HytaleServer.jar</code>, <code>mods/</code>, and world data will be set up.</small>
+        <div class="field">
+          <span class="field-label">Get server files from</span>
+          <div class="choice-list">
+            <label class="choice">
+              <input type="radio" name="wizard-source" value="local_client" checked>
+              <span class="choice-body">
+                <span class="choice-title">Hytale game on this PC <span id="wizard-local-detected-badge" class="tag tag-success hidden">Found</span></span>
+                <span class="choice-desc">Fastest — copies files from your installed game. No download.</span>
+              </span>
+            </label>
+            <label class="choice">
+              <input type="radio" name="wizard-source" value="download">
+              <span class="choice-body">
+                <span class="choice-title">Download from Hytale</span>
+                <span class="choice-desc">Latest official build. Requires signing in.</span>
+              </span>
+            </label>
+            <label class="choice">
+              <input type="radio" name="wizard-source" value="zip_file">
+              <span class="choice-body">
+                <span class="choice-title">A .zip I already have</span>
+                <span class="choice-desc">Use a previously downloaded server archive.</span>
+                <span id="wizard-zip-file-picker" class="input-group hidden">
+                  <input type="text" id="wizard-zip-file-input" class="input mono" placeholder="No file selected" readonly>
+                  <button id="wizard-btn-browse-zip" class="btn btn-secondary btn-sm" type="button">Browse</button>
+                </span>
+              </span>
+            </label>
           </div>
+        </div>
 
-          <!-- Step 2: Source -->
-          <div class="form-group mt-16">
-            <label>2. Choose Server Files Source</label>
-            <div class="radio-card-group">
-              <label class="radio-card" id="source-card-local">
-                <input type="radio" name="wizard-source" value="local_client" checked>
-                <div class="radio-card-content">
-                  <div class="radio-title">
-                    ⚡ Copy from Local Hytale Client
-                    <span id="wizard-local-detected-badge" class="badge badge-success">Detected on PC</span>
-                  </div>
-                  <div class="radio-desc">
-                    Fastest (zero download required). Directly clones server binaries and <code>Assets.zip</code> from your local Hytale launcher installation.
-                  </div>
-                </div>
-              </label>
-
-              <label class="radio-card" id="source-card-download">
-                <input type="radio" name="wizard-source" value="download">
-                <div class="radio-card-content">
-                  <div class="radio-title">
-                    🌐 Download from Hytale Account (OAuth2)
-                  </div>
-                  <div class="radio-desc">
-                    Downloads the latest official server build package (e.g. <code>0.7.2.zip</code>) directly from Hytale's high-speed CDN.
-                  </div>
-                </div>
-              </label>
-
-              <label class="radio-card" id="source-card-zip">
-                <input type="radio" name="wizard-source" value="zip_file">
-                <div class="radio-card-content">
-                  <div class="radio-title">
-                    📦 Select Existing Server ZIP File
-                  </div>
-                  <div class="radio-desc">
-                    Unpack a previously downloaded server archive (e.g. <code>0.7.1.zip</code>).
-                  </div>
-                  <div id="wizard-zip-file-picker" class="input-with-button mt-8 hidden">
-                    <input type="text" id="wizard-zip-file-input" class="input-text" placeholder="Click browse to select a .zip file..." readonly>
-                    <button id="wizard-btn-browse-zip" class="btn btn-secondary btn-sm" type="button">Browse Zip...</button>
-                  </div>
-                </div>
-              </label>
-            </div>
+        <details class="disclosure">
+          <summary>Server settings</summary>
+          <div class="grid-2 grid-tight">
+            <label class="field"><span class="field-label">Name</span><input type="text" id="wizard-server-name" class="input" value="My Hytale Server"></label>
+            <label class="field"><span class="field-label">Game mode</span>
+              <select id="wizard-game-mode" class="select"><option value="Adventure">Adventure</option><option value="Creative">Creative</option></select>
+            </label>
+            <label class="field"><span class="field-label">Port</span><input type="number" id="wizard-port" class="input" value="5520" min="1" max="65535"></label>
+            <label class="field"><span class="field-label">Max players</span><input type="number" id="wizard-max-players" class="input" value="20" min="1"></label>
           </div>
+          <label class="field"><span class="field-label">Welcome message</span><input type="text" id="wizard-motd" class="input" value="Welcome to our Hytale server!"></label>
+        </details>
 
-          <!-- Step 3: Server Preferences -->
-          <div class="form-group mt-16">
-            <label>3. Server Configuration & Networking</label>
-            <div class="grid-2-col">
-              <div>
-                <label class="form-sublabel">Server Display Name</label>
-                <input type="text" id="wizard-server-name" class="input-text" value="My Hytale Server">
-              </div>
-              <div>
-                <label class="form-sublabel">Default Game Mode</label>
-                <select id="wizard-game-mode" class="input-select">
-                  <option value="Adventure">Adventure</option>
-                  <option value="Creative">Creative</option>
-                </select>
-              </div>
-              <div>
-                <label class="form-sublabel">QUIC UDP Port (Default 5520)</label>
-                <input type="number" id="wizard-port" class="input-text" value="5520">
-              </div>
-              <div>
-                <label class="form-sublabel">Max Players</label>
-                <input type="number" id="wizard-max-players" class="input-text" value="20">
-              </div>
-            </div>
-            <div class="mt-8">
-              <label class="form-sublabel">Server Message of the Day (MOTD)</label>
-              <input type="text" id="wizard-motd" class="input-text" value="Welcome to our Hytale Dedicated Server!">
-            </div>
-          </div>
-
-          <!-- Installation Progress (Conditional) -->
-          <div id="wizard-progress-wrap" class="progress-wrap hidden mt-16">
-            <div class="progress-bar">
-              <div id="wizard-progress-fill" class="progress-fill" style="width: 0%"></div>
-            </div>
-            <div id="wizard-progress-text" class="progress-status-text">Initializing...</div>
-          </div>
+        <div id="wizard-progress-wrap" class="progress progress-block hidden">
+          <div class="progress-track"><div id="wizard-progress-fill" class="progress-fill"></div></div>
+          <span id="wizard-progress-text" class="progress-label">Starting…</span>
         </div>
       </div>
-      <div class="modal-footer">
-        <button id="wizard-btn-cancel" class="btn btn-secondary">Cancel</button>
-        <button id="wizard-btn-start" class="btn btn-primary">🚀 Begin Server Installation</button>
+      <div class="modal-foot">
+        <button id="wizard-btn-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="wizard-btn-start" class="btn btn-primary">Set up server</button>
       </div>
     </div>
   </div>
 
-  <!-- Mod Details Modal -->
-  <div id="mod-modal" class="modal-overlay hidden">
-    <div class="modal-window">
-      <div class="modal-header">
-        <h3 id="modal-mod-title">Mod Details</h3>
-        <button id="modal-close-btn" class="modal-close">&times;</button>
+  <!-- ============================ MOD DETAILS ============================ -->
+  <div id="mod-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-mod-title">
+    <div class="modal-panel modal-lg">
+      <div class="modal-head">
+        <div class="mod-head">
+          <div id="modal-mod-avatar" class="mod-avatar mod-avatar-lg"></div>
+          <div class="min-w-0">
+            <h3 id="modal-mod-title" class="modal-title truncate">Mod</h3>
+            <p id="modal-mod-meta" class="modal-sub"></p>
+          </div>
+        </div>
+        <button id="modal-close-btn" class="icon-btn" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
       </div>
-      <div class="modal-body" id="modal-mod-content">
-        <!-- Dynamic mod description -->
+      <div class="modal-body prose" id="modal-mod-content"></div>
+      <div class="modal-foot" id="modal-mod-footer"></div>
+    </div>
+  </div>
+
+  <!-- ============================ SIGN IN ============================ -->
+  <div id="login-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <div class="modal-panel modal-sm">
+      <div class="modal-head">
+        <div>
+          <h3 id="login-title" class="modal-title">Sign in to Hytale</h3>
+          <p class="modal-sub">Confirm this code in the browser window that just opened.</p>
+        </div>
       </div>
-      <div class="modal-footer" id="modal-mod-footer">
-        <!-- Install or Update button -->
+      <div class="modal-body center">
+        <div id="login-user-code" class="device-code">········</div>
+        <div class="row-gap">
+          <button id="btn-copy-code" class="btn btn-ghost btn-sm"><svg class="ic"><use href="#i-copy"/></svg><span>Copy</span></button>
+          <button id="btn-open-verify-url" class="btn btn-secondary btn-sm"><svg class="ic"><use href="#i-external"/></svg><span>Open browser</span></button>
+        </div>
+        <div class="waiting"><span class="spinner"></span>Waiting for confirmation…</div>
+      </div>
+      <div class="modal-foot">
+        <button id="btn-cancel-login" class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ GENERIC DIALOG ============================ -->
+  <div id="dialog-modal" class="modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title">
+    <div class="modal-panel modal-sm">
+      <div class="modal-head"><h3 id="dialog-title" class="modal-title"></h3></div>
+      <div class="modal-body">
+        <p id="dialog-message" class="dialog-message"></p>
+        <div id="dialog-fields"></div>
+      </div>
+      <div class="modal-foot">
+        <button id="dialog-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="dialog-confirm" class="btn btn-primary">Confirm</button>
       </div>
     </div>
   </div>

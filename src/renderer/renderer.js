@@ -1,330 +1,536 @@
 'use strict';
 
-// DOM Elements
-const navButtons = document.querySelectorAll('.nav-item');
-const tabPanes = document.querySelectorAll('.tab-pane');
-const pageTitle = document.getElementById('page-title');
-const toastContainer = document.getElementById('toast-container');
+// ============================================================================
+// DOM References
+// ============================================================================
+const $ = (id) => document.getElementById(id);
 
-// Sidebar Elements
-const sidebarServerBadge = document.getElementById('sidebar-server-badge');
-const sidebarAccountPill = document.getElementById('sidebar-account-pill');
-const sidebarAccountText = document.getElementById('sidebar-account-text');
-const installedModsCountBadge = document.getElementById('installed-mods-count');
-const quickServerBtn = document.getElementById('quick-server-btn');
-const openServerFolderBtn = document.getElementById('open-server-folder-btn');
+const appEl = $('app');
+const navButtons = document.querySelectorAll('.nav-item[data-tab]');
+const pages = document.querySelectorAll('.page');
+const pageTitle = $('page-title');
+const toastContainer = $('toast-container');
 
-// Dashboard Elements
-const serverNotInstalledBanner = document.getElementById('server-not-installed-banner');
-const btnOpenInstallWizardDash = document.getElementById('btn-open-install-wizard-dash');
-const btnTopbarInstallWizard = document.getElementById('btn-topbar-install-wizard');
-const serverUpdateBanner = document.getElementById('server-update-banner');
-const targetVersionTag = document.getElementById('target-version-tag');
-const btnUpdateServerNow = document.getElementById('btn-update-server-now');
-const updateProgressContainer = document.getElementById('update-progress-container');
-const updateProgressFill = document.getElementById('update-progress-fill');
-const updateProgressText = document.getElementById('update-progress-text');
-const dashServerDir = document.getElementById('dash-server-dir');
-const dashInstalledVer = document.getElementById('dash-installed-ver');
-const dashUpstreamVer = document.getElementById('dash-upstream-ver');
-const dashActiveProfile = document.getElementById('dash-active-profile');
-const dashServerStatus = document.getElementById('dash-server-status');
-const dashVersionBadge = document.getElementById('dash-version-badge');
-const dashAuthBadge = document.getElementById('dash-auth-status-badge');
-const dashCredsFile = document.getElementById('dash-creds-file');
-const dashCredsBranch = document.getElementById('dash-creds-branch');
-const btnCheckUpdates = document.getElementById('btn-check-updates');
-const btnDashOpenMods = document.getElementById('btn-dash-open-mods');
-const btnDashLoginHytale = document.getElementById('btn-dash-login-hytale');
-const btnDashRefreshAuth = document.getElementById('btn-dash-refresh-auth');
-const statTotalMods = document.getElementById('stat-total-mods');
-const statEnabledMods = document.getElementById('stat-enabled-mods');
-const statUpdatesMods = document.getElementById('stat-updates-mods');
-const statActiveProfiles = document.getElementById('stat-active-profiles');
+// Sidebar & Topbar
+const navModsCount = $('nav-mods-count');
+const sidebarAccount = $('sidebar-account');
+const sidebarAccountDot = $('sidebar-account-dot');
+const sidebarAccountText = $('sidebar-account-text');
+const topbarStatus = $('topbar-status');
+const topbarStatusText = $('topbar-status-text');
+const quickServerBtn = $('quick-server-btn');
 
-// Installed Mods Elements
-const modsSearchInput = document.getElementById('mods-search-input');
-const modsFilterStatus = document.getElementById('mods-filter-status');
-const btnRefreshInstalledMods = document.getElementById('btn-refresh-installed-mods');
-const btnOpenModsFolder = document.getElementById('btn-open-mods-folder');
-const btnUpdateAllMods = document.getElementById('btn-update-all-mods');
-const installedModsList = document.getElementById('installed-mods-list');
+// Overview
+const serverNotInstalledBanner = $('server-not-installed-banner');
+const btnChangeFolderDash = $('btn-change-folder-dash');
+const btnOpenInstallWizardDash = $('btn-open-install-wizard-dash');
+const heroDot = $('hero-dot');
+const heroLabel = $('hero-label');
+const heroSub = $('hero-sub');
+const heroFolderBtn = $('hero-folder-btn');
+const heroConsoleBtn = $('hero-console-btn');
+const heroServerBtn = $('hero-server-btn');
+const serverUpdateBanner = $('server-update-banner');
+const targetVersionTag = $('target-version-tag');
+const updateProgressContainer = $('update-progress-container');
+const updateProgressFill = $('update-progress-fill');
+const updateProgressText = $('update-progress-text');
+const btnUpdateServerNow = $('btn-update-server-now');
+const statTotalMods = $('stat-total-mods');
+const statEnabledMods = $('stat-enabled-mods');
+const statUpdatesMods = $('stat-updates-mods');
+const statActiveProfiles = $('stat-active-profiles');
+const btnCheckUpdates = $('btn-check-updates');
+const dashInstalledVer = $('dash-installed-ver');
+const dashUpstreamVer = $('dash-upstream-ver');
+const dashActiveProfile = $('dash-active-profile');
+const dashServerDir = $('dash-server-dir');
+const dashAuthBadge = $('dash-auth-status-badge');
+const dashAuthDesc = $('dash-auth-desc');
+const btnDashLoginHytale = $('btn-dash-login-hytale');
 
-// CurseForge Elements
-const cfSearchInput = document.getElementById('cf-search-input');
-const cfCategorySelect = document.getElementById('cf-category-select');
-const cfSortSelect = document.getElementById('cf-sort-select');
-const btnCfSearch = document.getElementById('btn-cf-search');
-const cfResultsGrid = document.getElementById('cf-results-grid');
-const cfPrevPage = document.getElementById('cf-prev-page');
-const cfNextPage = document.getElementById('cf-next-page');
-const cfPageInfo = document.getElementById('cf-page-info');
+// Console
+const consoleStatusBadge = $('console-status-badge');
+const consoleLaunchMode = $('console-launch-mode');
+const btnClearConsole = $('btn-clear-console');
+const detachedModeNotice = $('detached-mode-notice');
+const detachedModeText = $('detached-mode-text');
+const consoleOutput = $('console-output');
+const consoleJump = $('console-jump');
+const consoleInputForm = $('console-input-form');
+const consoleInput = $('console-input');
 
-// Thunderstore Elements
-const tsSearchInput = document.getElementById('ts-search-input');
-const tsSortSelect = document.getElementById('ts-sort-select');
-const btnTsSearch = document.getElementById('btn-ts-search');
-const btnTsRefresh = document.getElementById('btn-ts-refresh');
-const tsResultsGrid = document.getElementById('ts-results-grid');
+// Library
+const modsSearchInput = $('mods-search-input');
+const modsFilter = $('mods-filter');
+const btnUpdateAllMods = $('btn-update-all-mods');
+const btnRefreshInstalledMods = $('btn-refresh-installed-mods');
+const btnOpenModsFolder = $('btn-open-mods-folder');
+const installedModsList = $('installed-mods-list');
 
-// Profiles Elements
-const btnCreateProfile = document.getElementById('btn-create-profile');
-const btnImportProfile = document.getElementById('btn-import-profile');
-const profilesList = document.getElementById('profiles-list');
+// Browse (Unified CurseForge + Thunderstore)
+const browseSource = $('browse-source');
+const browseSearchInput = $('browse-search-input');
+const cfCategorySelect = $('cf-category-select');
+const cfSortSelect = $('cf-sort-select');
+const tsSortSelect = $('ts-sort-select');
+const browseCf = $('browse-cf');
+const cfResultsGrid = $('cf-results-grid');
+const cfPrevPage = $('cf-prev-page');
+const cfPageInfo = $('cf-page-info');
+const cfNextPage = $('cf-next-page');
+const browseTs = $('browse-ts');
+const tsResultsGrid = $('ts-results-grid');
 
-// Console Elements
-const consoleOutput = document.getElementById('console-output');
-const consoleInputForm = document.getElementById('console-input-form');
-const consoleInput = document.getElementById('console-input');
-const consoleAutoScroll = document.getElementById('console-autoscroll');
-const btnClearConsole = document.getElementById('btn-clear-console');
-const consoleLaunchMode = document.getElementById('console-launch-mode');
-const detachedModeNotice = document.getElementById('detached-mode-notice');
-const consoleStatusDot = document.getElementById('console-status-dot');
-const consoleStatusBadge = document.getElementById('console-status-badge');
+// Profiles
+const btnImportProfile = $('btn-import-profile');
+const btnCreateProfile = $('btn-create-profile');
+const profilesList = $('profiles-list');
 
-// Settings Elements
-const settingsServerDir = document.getElementById('settings-server-dir');
-const btnBrowseServerDir = document.getElementById('btn-browse-server-dir');
-const settingsLaunchMode = document.getElementById('settings-launch-mode');
-const settingsMaxRam = document.getElementById('settings-max-ram');
-const settingsCloseToTray = document.getElementById('settings-close-to-tray');
-const settingsPatchline = document.getElementById('settings-patchline');
-const settingsCfApiKey = document.getElementById('settings-cf-api-key');
-const btnSaveSettings = document.getElementById('btn-save-settings');
-const deviceLoginDisplay = document.getElementById('device-login-display');
-const loginUserCode = document.getElementById('login-user-code');
-const btnOpenVerifyUrl = document.getElementById('btn-open-verify-url');
-const btnCancelLogin = document.getElementById('btn-cancel-login');
-const btnTriggerDeviceLogin = document.getElementById('btn-trigger-device-login');
+// Settings
+const settingsServerDir = $('settings-server-dir');
+const btnSettingsSetup = $('btn-settings-setup');
+const btnBrowseServerDir = $('btn-browse-server-dir');
+const settingsMaxRam = $('settings-max-ram');
+const settingsLaunchMode = $('settings-launch-mode');
+const settingsPatchline = $('settings-patchline');
+const settingsCloseToTray = $('settings-close-to-tray');
+const settingsLoginItem = $('settings-login-item');
+const settingsAccountDesc = $('settings-account-desc');
+const btnTriggerDeviceLogin = $('btn-trigger-device-login');
+const settingsCfApiKey = $('settings-cf-api-key');
 
-// Modal Elements
-const modModal = document.getElementById('mod-modal');
-const modalModTitle = document.getElementById('modal-mod-title');
-const modalModContent = document.getElementById('modal-mod-content');
-const modalModFooter = document.getElementById('modal-mod-footer');
-const modalCloseBtn = document.getElementById('modal-close-btn');
+// Setup Wizard Modal
+const installModal = $('install-modal');
+const modalInstallCloseBtn = $('modal-install-close-btn');
+const wizardJavaDot = $('wizard-java-dot');
+const wizardJavaText = $('wizard-java-text');
+const wizardTargetDir = $('wizard-target-dir');
+const wizardBtnBrowseDir = $('wizard-btn-browse-dir');
+const wizardLocalDetectedBadge = $('wizard-local-detected-badge');
+const wizardZipFilePicker = $('wizard-zip-file-picker');
+const wizardZipFileInput = $('wizard-zip-file-input');
+const wizardBtnBrowseZip = $('wizard-btn-browse-zip');
+const wizardServerName = $('wizard-server-name');
+const wizardGameMode = $('wizard-game-mode');
+const wizardPort = $('wizard-port');
+const wizardMaxPlayers = $('wizard-max-players');
+const wizardMotd = $('wizard-motd');
+const wizardProgressWrap = $('wizard-progress-wrap');
+const wizardProgressFill = $('wizard-progress-fill');
+const wizardProgressText = $('wizard-progress-text');
+const wizardBtnCancel = $('wizard-btn-cancel');
+const wizardBtnStart = $('wizard-btn-start');
 
-// Installation Wizard Elements
-const installModal = document.getElementById('install-modal');
-const modalInstallCloseBtn = document.getElementById('modal-install-close-btn');
-const wizardTargetDir = document.getElementById('wizard-target-dir');
-const wizardBtnBrowseDir = document.getElementById('wizard-btn-browse-dir');
-const wizardLocalDetectedBadge = document.getElementById('wizard-local-detected-badge');
-const wizardJavaStatus = document.getElementById('wizard-java-status');
-const wizardJavaText = document.getElementById('wizard-java-text');
-const wizardZipFilePicker = document.getElementById('wizard-zip-file-picker');
-const wizardZipFileInput = document.getElementById('wizard-zip-file-input');
-const wizardBtnBrowseZip = document.getElementById('wizard-btn-browse-zip');
-const wizardServerName = document.getElementById('wizard-server-name');
-const wizardGameMode = document.getElementById('wizard-game-mode');
-const wizardPort = document.getElementById('wizard-port');
-const wizardMaxPlayers = document.getElementById('wizard-max-players');
-const wizardMotd = document.getElementById('wizard-motd');
-const wizardProgressWrap = document.getElementById('wizard-progress-wrap');
-const wizardProgressFill = document.getElementById('wizard-progress-fill');
-const wizardProgressText = document.getElementById('wizard-progress-text');
-const wizardBtnCancel = document.getElementById('wizard-btn-cancel');
-const wizardBtnStart = document.getElementById('wizard-btn-start');
+// Mod Details Modal
+const modModal = $('mod-modal');
+const modalModAvatar = $('modal-mod-avatar');
+const modalModTitle = $('modal-mod-title');
+const modalModMeta = $('modal-mod-meta');
+const modalModContent = $('modal-mod-content');
+const modalModFooter = $('modal-mod-footer');
+const modalCloseBtn = $('modal-close-btn');
 
-// State
+// Sign-in Modal
+const loginModal = $('login-modal');
+const loginUserCode = $('login-user-code');
+const btnCopyCode = $('btn-copy-code');
+const btnOpenVerifyUrl = $('btn-open-verify-url');
+const btnCancelLogin = $('btn-cancel-login');
+
+// Generic Dialog Modal
+const dialogModal = $('dialog-modal');
+const dialogTitle = $('dialog-title');
+const dialogMessage = $('dialog-message');
+const dialogFields = $('dialog-fields');
+const dialogCancel = $('dialog-cancel');
+const dialogConfirm = $('dialog-confirm');
+
+// ============================================================================
+// Application State
+// ============================================================================
 let appConfig = null;
+let currentTab = 'overview';
 let currentInstalledMods = [];
+let currentModsFilter = 'all';
+let currentBrowseSource = 'curseforge';
 let cfPageIndex = 0;
 const CF_PAGE_SIZE = 18;
+let cfLoadedOnce = false;
+let tsLoadedOnce = false;
 let activeDeviceAuth = null;
 let commandHistory = [];
 let historyIndex = -1;
+let lastServerStatus = { isRunning: false, isDetached: false, pid: null };
 
-// ==========================================
-// TOAST NOTIFICATIONS
-// ==========================================
+// ============================================================================
+// Utilities & Dialogs
+// ============================================================================
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function formatNumber(num) {
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+  return String(num || 0);
+}
+
+function debounce(fn, ms = 260) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>${message}</span>`;
+  const iconId = type === 'success' ? 'i-check' : type === 'error' ? 'i-alert' : 'i-info';
+  toast.innerHTML = `<svg class="ic"><use href="#${iconId}"/></svg><span>${escapeHtml(message)}</span>`;
   toastContainer.appendChild(toast);
   setTimeout(() => {
     toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
+    toast.style.transform = 'translateY(4px)';
+    setTimeout(() => toast.remove(), 200);
+  }, 3500);
 }
 
-// ==========================================
-// TAB NAVIGATION
-// ==========================================
+function confirmDialog({ title, message, confirmLabel = 'Confirm', danger = false }) {
+  return new Promise((resolve) => {
+    dialogTitle.textContent = title;
+    dialogMessage.textContent = message;
+    dialogFields.innerHTML = '';
+    dialogConfirm.textContent = confirmLabel;
+    dialogConfirm.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
+    dialogModal.classList.remove('hidden');
+
+    const cleanup = (result) => {
+      dialogModal.classList.add('hidden');
+      dialogConfirm.removeEventListener('click', onConfirm);
+      dialogCancel.removeEventListener('click', onCancel);
+      resolve(result);
+    };
+    const onConfirm = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+
+    dialogConfirm.addEventListener('click', onConfirm);
+    dialogCancel.addEventListener('click', onCancel);
+    dialogConfirm.focus();
+  });
+}
+
+function promptDialog({ title, message = '', fields = [], confirmLabel = 'Save' }) {
+  return new Promise((resolve) => {
+    dialogTitle.textContent = title;
+    dialogMessage.textContent = message;
+    dialogMessage.classList.toggle('hidden', !message);
+    dialogFields.innerHTML = fields
+      .map(
+        (f) => `
+        <label class="field">
+          <span class="field-label">${escapeHtml(f.label)}</span>
+          <input type="text" class="input" data-field="${escapeHtml(f.name)}" placeholder="${escapeHtml(f.placeholder || '')}" value="${escapeHtml(f.value || '')}">
+        </label>`
+      )
+      .join('');
+    dialogConfirm.textContent = confirmLabel;
+    dialogConfirm.className = 'btn btn-primary';
+    dialogModal.classList.remove('hidden');
+
+    const firstInput = dialogFields.querySelector('input');
+    if (firstInput) setTimeout(() => firstInput.focus(), 20);
+
+    const cleanup = (result) => {
+      dialogModal.classList.add('hidden');
+      dialogMessage.classList.remove('hidden');
+      dialogConfirm.removeEventListener('click', onConfirm);
+      dialogCancel.removeEventListener('click', onCancel);
+      resolve(result);
+    };
+    const onConfirm = () => {
+      const values = {};
+      dialogFields.querySelectorAll('input[data-field]').forEach((inp) => {
+        values[inp.dataset.field] = inp.value.trim();
+      });
+      cleanup(values);
+    };
+    const onCancel = () => cleanup(null);
+
+    dialogConfirm.addEventListener('click', onConfirm);
+    dialogCancel.addEventListener('click', onCancel);
+  });
+}
+
+function setSegmentedValue(container, value) {
+  if (!container) return;
+  container.querySelectorAll('button[data-value]').forEach((btn) => {
+    const active = btn.dataset.value === value;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+}
+
+// ============================================================================
+// Navigation & Shortcuts
+// ============================================================================
+const TAB_TITLES = {
+  overview: 'Overview',
+  console: 'Console',
+  library: 'Library',
+  browse: 'Browse Mods',
+  profiles: 'Profiles',
+  settings: 'Settings',
+};
+
 function switchTab(tabId) {
+  if (!TAB_TITLES[tabId]) return;
+  currentTab = tabId;
+
   navButtons.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tab === tabId);
   });
-  tabPanes.forEach((pane) => {
+  pages.forEach((pane) => {
     pane.classList.toggle('active', pane.id === `tab-${tabId}`);
   });
+  pageTitle.textContent = TAB_TITLES[tabId];
 
-  const titles = {
-    dashboard: 'Dashboard',
-    'installed-mods': 'Installed Mods',
-    curseforge: 'CurseForge Mod Browser',
-    thunderstore: 'Thunderstore Mod Browser',
-    profiles: 'Mod Profiles',
-    console: 'Server Console',
-    settings: 'Settings & Authentication',
-  };
-  pageTitle.textContent = titles[tabId] || 'Dashboard';
-
-  if (tabId === 'installed-mods') loadInstalledMods();
-  if (tabId === 'curseforge') loadCurseForgeMods();
-  if (tabId === 'thunderstore') loadThunderstoreMods();
-  if (tabId === 'profiles') loadProfiles();
+  if (tabId === 'library') {
+    loadInstalledMods(false);
+  } else if (tabId === 'browse') {
+    if (currentBrowseSource === 'curseforge' && !cfLoadedOnce) loadCurseForgeMods();
+    if (currentBrowseSource === 'thunderstore' && !tsLoadedOnce) loadThunderstoreMods();
+  } else if (tabId === 'profiles') {
+    loadProfiles();
+  } else if (tabId === 'console') {
+    scrollToConsoleBottom();
+    consoleInput.focus();
+  }
 }
 
 navButtons.forEach((btn) => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
-// ==========================================
-// INITIALIZATION
-// ==========================================
+// Overview stat cards jump to target views
+document.querySelectorAll('.stat[data-goto]').forEach((statBtn) => {
+  statBtn.addEventListener('click', () => {
+    const target = statBtn.dataset.goto;
+    const filter = statBtn.dataset.filter;
+    if (filter) {
+      currentModsFilter = filter;
+      setSegmentedValue(modsFilter, filter);
+      renderInstalledModsList();
+    }
+    switchTab(target);
+  });
+});
+
+heroConsoleBtn.addEventListener('click', () => switchTab('console'));
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    [modModal, installModal].forEach((m) => m.classList.add('hidden'));
+    if (!dialogModal.classList.contains('hidden')) dialogCancel.click();
+    return;
+  }
+
+  if (e.ctrlKey || e.metaKey) {
+    const map = { '1': 'overview', '2': 'console', '3': 'library', '4': 'browse', '5': 'profiles', ',': 'settings' };
+    if (map[e.key]) {
+      e.preventDefault();
+      switchTab(map[e.key]);
+    }
+    return;
+  }
+
+  // '/' focuses the search input on the active page
+  if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+    const activePage = document.querySelector('.page.active');
+    const searchInput = activePage?.querySelector('[data-page-search]');
+    if (searchInput) {
+      e.preventDefault();
+      searchInput.focus();
+    }
+  }
+});
+
+// ============================================================================
+// Initialization
+// ============================================================================
 async function init() {
   try {
     appConfig = await window.api.getConfig();
-    if (appConfig.serverDir) {
-      dashServerDir.textContent = appConfig.serverDir;
-      settingsServerDir.value = appConfig.serverDir;
-    }
-    if (appConfig.patchline) {
-      settingsPatchline.value = appConfig.patchline;
-    }
-    if (appConfig.cfApiKey) {
-      settingsCfApiKey.value = appConfig.cfApiKey;
-    }
-    if (appConfig.launchMode) {
-      if (consoleLaunchMode) consoleLaunchMode.value = appConfig.launchMode;
-      if (settingsLaunchMode) settingsLaunchMode.value = appConfig.launchMode;
-    }
-    if (appConfig.maxRam && settingsMaxRam) {
-      settingsMaxRam.value = appConfig.maxRam;
-    }
-    if (typeof appConfig.closeToTray === 'boolean' && settingsCloseToTray) {
-      settingsCloseToTray.checked = appConfig.closeToTray;
-    }
-    if (detachedModeNotice && appConfig.launchMode === 'detached') {
-      detachedModeNotice.classList.remove('hidden');
+    applyConfigToUI();
+
+    const loginItemEnabled = await window.api.getLoginItem();
+    settingsLoginItem.checked = Boolean(loginItemEnabled);
+
+    // Load existing console log history
+    const logs = await window.api.getServerLogs();
+    if (Array.isArray(logs) && logs.length > 0) {
+      consoleOutput.innerHTML = '';
+      logs.forEach((entry) => queueLogLine(entry));
     }
 
-    // Refresh components
-    await refreshAccountStatus();
-    await checkServerVersion();
-    await loadInstalledMods();
-    await refreshServerStatus();
-    await loadCfCategories();
+    // Parallel non-blocking initial data loads
+    await Promise.all([
+      refreshServerStatus(),
+      refreshAccountStatus(),
+      checkServerVersion(),
+      loadInstalledMods(true),
+      loadProfilesCount(),
+      loadCfCategories(),
+    ]);
   } catch (e) {
-    showToast(`Init error: ${e.message}`, 'error');
+    showToast(`Initialization failed: ${e.message}`, 'error');
   }
 }
 
-// ==========================================
-// ACCOUNT STATUS & LOGIN
-// ==========================================
+function applyConfigToUI() {
+  if (!appConfig) return;
+  const dir = appConfig.serverDir || '—';
+  dashServerDir.textContent = dir;
+  dashServerDir.title = dir;
+  settingsServerDir.textContent = dir;
+
+  if (appConfig.patchline) settingsPatchline.value = appConfig.patchline;
+  if (appConfig.maxRam) settingsMaxRam.value = appConfig.maxRam;
+  if (appConfig.cfApiKey) settingsCfApiKey.value = appConfig.cfApiKey;
+  if (typeof appConfig.closeToTray === 'boolean') settingsCloseToTray.checked = appConfig.closeToTray;
+
+  const mode = appConfig.launchMode || 'integrated';
+  setSegmentedValue(consoleLaunchMode, mode);
+  setSegmentedValue(settingsLaunchMode, mode);
+}
+
+async function saveConfigPatch(patch) {
+  appConfig = { ...(appConfig || {}), ...patch };
+  await window.api.saveConfig(appConfig);
+  applyConfigToUI();
+}
+
+// ============================================================================
+// Hytale Account & Device Code Sign-In
+// ============================================================================
 async function refreshAccountStatus() {
   try {
     const status = await window.api.getHytaleStatus();
-    const dot = sidebarAccountPill.querySelector('.account-dot');
 
     if (status.authenticated && !status.isExpired) {
-      dot.className = 'account-dot dot-green';
-      sidebarAccountText.textContent = 'Hytale Connected';
-      dashAuthBadge.className = 'badge badge-success';
+      sidebarAccountDot.className = 'dot dot-ok';
+      sidebarAccountText.textContent = 'Connected';
+      dashAuthBadge.className = 'tag tag-success';
       dashAuthBadge.textContent = 'Connected';
-      dashCredsFile.textContent = status.credentialsPath || 'Found';
-      dashCredsBranch.textContent = status.branch || 'release';
-      btnDashLoginHytale.textContent = 'Reconnect Account';
+      dashAuthDesc.textContent = `Signed in (${status.branch || 'release'} channel). Official server updates are enabled.`;
+      btnDashLoginHytale.querySelector('span').textContent = 'Reconnect';
+      settingsAccountDesc.textContent = `Connected · credentials saved in server folder.`;
+      btnTriggerDeviceLogin.textContent = 'Reconnect';
     } else if (status.authenticated && status.isExpired) {
-      dot.className = 'account-dot dot-yellow';
-      sidebarAccountText.textContent = 'Token Expired';
-      dashAuthBadge.className = 'badge badge-warning';
+      sidebarAccountDot.className = 'dot dot-warn';
+      sidebarAccountText.textContent = 'Session expired';
+      dashAuthBadge.className = 'tag tag-warning';
       dashAuthBadge.textContent = 'Expired';
+      dashAuthDesc.textContent = 'Your session expired. Sign in again to check for and install server updates.';
+      btnDashLoginHytale.querySelector('span').textContent = 'Sign in';
+      settingsAccountDesc.textContent = 'Session expired. Sign in again to refresh.';
+      btnTriggerDeviceLogin.textContent = 'Sign in';
     } else {
-      dot.className = 'account-dot dot-gray';
-      sidebarAccountText.textContent = 'Unlinked';
-      dashAuthBadge.className = 'badge badge-offline';
-      dashAuthBadge.textContent = 'Not Connected';
-      dashCredsFile.textContent = 'No credentials file found';
+      sidebarAccountDot.className = 'dot dot-muted';
+      sidebarAccountText.textContent = 'Not signed in';
+      dashAuthBadge.className = 'tag';
+      dashAuthBadge.textContent = 'Not signed in';
+      dashAuthDesc.textContent = 'Sign in to download server updates directly from Hytale.';
+      btnDashLoginHytale.querySelector('span').textContent = 'Sign in';
+      settingsAccountDesc.textContent = 'Used to download official server updates.';
+      btnTriggerDeviceLogin.textContent = 'Sign in';
     }
   } catch {
-    sidebarAccountText.textContent = 'Auth Error';
+    sidebarAccountDot.className = 'dot dot-err';
+    sidebarAccountText.textContent = 'Error';
   }
 }
 
 async function startHytaleDeviceLogin() {
   try {
-    switchTab('settings');
-    deviceLoginDisplay.classList.remove('hidden');
-    loginUserCode.textContent = 'Requesting...';
+    loginUserCode.textContent = '········';
+    loginModal.classList.remove('hidden');
 
     activeDeviceAuth = await window.api.startDeviceLogin();
-    loginUserCode.textContent = activeDeviceAuth.user_code;
+    loginUserCode.textContent = activeDeviceAuth.user_code || '—';
 
-    // Start background poll
     const res = await window.api.pollDeviceLogin(activeDeviceAuth);
+    loginModal.classList.add('hidden');
+
     if (res.success) {
-      showToast('Successfully authenticated with Hytale!', 'success');
-      deviceLoginDisplay.classList.add('hidden');
+      showToast('Signed in to Hytale', 'success');
       await refreshAccountStatus();
       await checkServerVersion();
-    } else {
-      showToast(`Login failed: ${res.error}`, 'error');
+    } else if (res.error && !String(res.error).toLowerCase().includes('cancel')) {
+      showToast(`Sign-in failed: ${res.error}`, 'error');
     }
   } catch (e) {
-    showToast(`Login error: ${e.message}`, 'error');
+    loginModal.classList.add('hidden');
+    showToast(`Sign-in error: ${e.message}`, 'error');
   }
 }
 
+sidebarAccount.addEventListener('click', () => {
+  startHytaleDeviceLogin();
+});
 btnDashLoginHytale.addEventListener('click', startHytaleDeviceLogin);
 btnTriggerDeviceLogin.addEventListener('click', startHytaleDeviceLogin);
-btnDashRefreshAuth.addEventListener('click', async () => {
-  await refreshAccountStatus();
-  showToast('Account status refreshed', 'info');
+
+btnCopyCode.addEventListener('click', async () => {
+  if (!activeDeviceAuth?.user_code) return;
+  try {
+    await navigator.clipboard.writeText(activeDeviceAuth.user_code);
+    showToast('Code copied to clipboard', 'success');
+  } catch {}
 });
 
 btnOpenVerifyUrl.addEventListener('click', () => {
-  if (activeDeviceAuth && activeDeviceAuth.verification_uri_complete) {
-    window.api.openExternal(activeDeviceAuth.verification_uri_complete);
-  }
+  const url = activeDeviceAuth?.verification_uri_complete || activeDeviceAuth?.verification_uri;
+  if (url) window.api.openExternal(url);
 });
 
 btnCancelLogin.addEventListener('click', async () => {
   await window.api.cancelLogin();
-  deviceLoginDisplay.classList.add('hidden');
-  showToast('Login cancelled', 'info');
+  loginModal.classList.add('hidden');
 });
 
-// ==========================================
-// SERVER VERSION & UPDATER
-// ==========================================
+// ============================================================================
+// Server Version & Updates
+// ============================================================================
 async function checkServerVersion() {
   try {
-    dashInstalledVer.textContent = 'Checking...';
-    dashUpstreamVer.textContent = 'Checking...';
+    dashInstalledVer.innerHTML = '<span class="skeleton-text"></span>';
+    dashUpstreamVer.innerHTML = '<span class="skeleton-text"></span>';
 
     const res = await window.api.checkServerVersion(appConfig?.patchline || 'release');
 
-    dashInstalledVer.textContent = res.installedVersion || (res.installed ? 'Unknown' : 'Not Installed');
-    dashVersionBadge.textContent = res.installedVersion ? `v${res.installedVersion}` : 'No Jar';
+    dashInstalledVer.textContent = res.installedVersion
+      ? `v${res.installedVersion}`
+      : res.installed
+      ? 'Installed'
+      : 'Not installed';
 
-    if (!res.installed) {
-      serverNotInstalledBanner.classList.remove('hidden');
-      serverUpdateBanner.classList.add('hidden');
-    } else {
-      serverNotInstalledBanner.classList.add('hidden');
-    }
+    serverNotInstalledBanner.classList.toggle('hidden', Boolean(res.installed));
 
     if (res.latestVersion) {
       dashUpstreamVer.textContent = `v${res.latestVersion}`;
     } else if (res.authRequired) {
-      dashUpstreamVer.textContent = 'Connect Hytale Account';
+      dashUpstreamVer.textContent = 'Sign in required';
     } else {
-      dashUpstreamVer.textContent = 'Unknown';
+      dashUpstreamVer.textContent = '—';
     }
 
     if (res.installed && res.updateAvailable && res.latestVersion) {
@@ -333,41 +539,42 @@ async function checkServerVersion() {
     } else {
       serverUpdateBanner.classList.add('hidden');
     }
-  } catch (e) {
-    dashInstalledVer.textContent = 'Error';
-    dashUpstreamVer.textContent = 'Error';
+  } catch {
+    dashInstalledVer.textContent = '—';
+    dashUpstreamVer.textContent = '—';
   }
 }
 
 btnCheckUpdates.addEventListener('click', async () => {
   await checkServerVersion();
-  showToast('Server version check complete', 'info');
+  showToast('Checked for server updates', 'info');
 });
 
 btnUpdateServerNow.addEventListener('click', async () => {
-  if (!confirm('Start automatic server update? The server will download the latest package, backup existing binaries, and extract the update.')) {
-    return;
-  }
+  const ok = await confirmDialog({
+    title: 'Update server now?',
+    message: 'Your existing server files will be backed up automatically before the new version is extracted.',
+    confirmLabel: 'Update server',
+  });
+  if (!ok) return;
 
   btnUpdateServerNow.disabled = true;
   updateProgressContainer.classList.remove('hidden');
   updateProgressFill.style.width = '0%';
-  updateProgressText.textContent = 'Starting server update...';
+  updateProgressText.textContent = 'Starting update…';
 
   const unlisten = window.api.onServerUpdateProgress((p) => {
     if (p.total && p.done) {
       const pct = Math.min(100, Math.round((p.done / p.total) * 100));
       updateProgressFill.style.width = `${pct}%`;
     }
-    if (p.message) {
-      updateProgressText.textContent = p.message;
-    }
+    if (p.message) updateProgressText.textContent = p.message;
   });
 
   try {
     const res = await window.api.performServerUpdate(appConfig?.patchline || 'release');
     if (res.success) {
-      showToast(`Server updated to v${res.newVersion}!`, 'success');
+      showToast(`Updated to v${res.newVersion}`, 'success');
       serverUpdateBanner.classList.add('hidden');
       await checkServerVersion();
     } else {
@@ -382,98 +589,78 @@ btnUpdateServerNow.addEventListener('click', async () => {
   }
 });
 
-// ==========================================
-// SERVER INSTALLATION WIZARD
-// ==========================================
+// ============================================================================
+// Server Setup Wizard
+// ============================================================================
 async function openInstallWizard() {
   installModal.classList.remove('hidden');
   wizardProgressWrap.classList.add('hidden');
   wizardProgressFill.style.width = '0%';
   wizardBtnStart.disabled = false;
 
-  // Set default target directory from current app config or input
   if (appConfig?.serverDir) {
     wizardTargetDir.value = appConfig.serverDir;
   }
 
-  // Check Java runtime status
+  wizardJavaDot.className = 'dot dot-muted';
+  wizardJavaText.textContent = 'Checking Java…';
+
   try {
     const javaInfo = await window.api.checkJava();
     if (javaInfo.installed) {
-      wizardJavaText.innerHTML = `<span class="text-success">${escapeHtml(javaInfo.version)} (Detected)</span> — ${
-        javaInfo.isJava25Recommended ? 'Meets recommended Java 25 requirement.' : 'Java found. Java 25 recommended for production.'
-      }`;
+      wizardJavaDot.className = javaInfo.isJava25Recommended ? 'dot dot-ok' : 'dot dot-warn';
+      wizardJavaText.textContent = javaInfo.isJava25Recommended
+        ? `${javaInfo.version} detected`
+        : `${javaInfo.version} detected (Java 25 recommended)`;
     } else {
-      wizardJavaText.innerHTML = `<span class="text-danger">Java not found in PATH</span> — Please install Java 25 (Adoptium Temurin) to run the server.`;
+      wizardJavaDot.className = 'dot dot-err';
+      wizardJavaText.textContent = 'Java not found in PATH — install Java 25 (Adoptium Temurin) to run the server.';
     }
   } catch {
-    wizardJavaText.textContent = 'Could not probe Java version.';
+    wizardJavaText.textContent = 'Could not detect Java version.';
   }
 
-  // Detect local client installation
   try {
     const local = await window.api.detectClientInstall();
-    if (local.detected) {
-      wizardLocalDetectedBadge.classList.remove('hidden');
-      wizardLocalDetectedBadge.textContent = 'Detected on PC ✓';
-      // Default select local_client
-      const localRadio = document.querySelector('input[name="wizard-source"][value="local_client"]');
-      if (localRadio) localRadio.checked = true;
-      wizardZipFilePicker.classList.add('hidden');
-    } else {
-      wizardLocalDetectedBadge.classList.add('hidden');
-      const dlRadio = document.querySelector('input[name="wizard-source"][value="download"]');
-      if (dlRadio) dlRadio.checked = true;
-      wizardZipFilePicker.classList.add('hidden');
-    }
+    wizardLocalDetectedBadge.classList.toggle('hidden', !local.detected);
+    const preferred = local.detected ? 'local_client' : 'download';
+    const radio = document.querySelector(`input[name="wizard-source"][value="${preferred}"]`);
+    if (radio) radio.checked = true;
+    wizardZipFilePicker.classList.add('hidden');
   } catch {
     wizardLocalDetectedBadge.classList.add('hidden');
   }
 }
 
-// Source radio buttons change listener
 document.querySelectorAll('input[name="wizard-source"]').forEach((radio) => {
   radio.addEventListener('change', (e) => {
-    if (e.target.value === 'zip_file') {
-      wizardZipFilePicker.classList.remove('hidden');
-    } else {
-      wizardZipFilePicker.classList.add('hidden');
-    }
+    wizardZipFilePicker.classList.toggle('hidden', e.target.value !== 'zip_file');
   });
 });
 
 wizardBtnBrowseDir.addEventListener('click', async () => {
   const chosen = await window.api.selectServerDir();
-  if (chosen) {
-    wizardTargetDir.value = chosen;
-  }
+  if (chosen) wizardTargetDir.value = chosen;
 });
 
 wizardBtnBrowseZip.addEventListener('click', async () => {
   const zip = await window.api.selectZipFileDialog();
-  if (zip) {
-    wizardZipFileInput.value = zip;
-  }
+  if (zip) wizardZipFileInput.value = zip;
 });
 
-modalInstallCloseBtn.addEventListener('click', () => {
-  installModal.classList.add('hidden');
-});
-
+modalInstallCloseBtn.addEventListener('click', () => installModal.classList.add('hidden'));
 wizardBtnCancel.addEventListener('click', () => {
   window.api.cancelServerInstall();
   installModal.classList.add('hidden');
 });
 
-btnTopbarInstallWizard.addEventListener('click', openInstallWizard);
-if (btnOpenInstallWizardDash) {
-  btnOpenInstallWizardDash.addEventListener('click', openInstallWizard);
-}
+btnOpenInstallWizardDash.addEventListener('click', openInstallWizard);
+btnSettingsSetup.addEventListener('click', openInstallWizard);
 
 wizardBtnStart.addEventListener('click', async () => {
   const targetDir = wizardTargetDir.value.trim();
   if (!targetDir) {
-    showToast('Please select a target server folder', 'error');
+    showToast('Choose a target folder first', 'error');
     return;
   }
 
@@ -481,204 +668,191 @@ wizardBtnStart.addEventListener('click', async () => {
   const zipPath = wizardZipFileInput.value.trim();
 
   if (selectedSource === 'zip_file' && !zipPath) {
-    showToast('Please browse and select an existing server .zip file', 'error');
+    showToast('Select a server .zip archive', 'error');
     return;
   }
-
-  const serverName = wizardServerName.value.trim() || 'My Hytale Server';
-  const motd = wizardMotd.value.trim() || 'Welcome to our Hytale Server!';
-  const port = parseInt(wizardPort.value, 10) || 5520;
-  const maxPlayers = parseInt(wizardMaxPlayers.value, 10) || 20;
-  const gameMode = wizardGameMode.value;
 
   wizardBtnStart.disabled = true;
   wizardProgressWrap.classList.remove('hidden');
   wizardProgressFill.style.width = '0%';
-  wizardProgressText.textContent = 'Starting server installation...';
+  wizardProgressText.textContent = 'Setting up server…';
 
-  const unlistenProgress = window.api.onInstallerProgress((p) => {
+  const unlisten = window.api.onInstallerProgress((p) => {
     if (p.total && p.done) {
       const pct = Math.min(100, Math.round((p.done / p.total) * 100));
       wizardProgressFill.style.width = `${pct}%`;
     }
-    if (p.message) {
-      wizardProgressText.textContent = p.message;
-    }
+    if (p.message) wizardProgressText.textContent = p.message;
   });
 
   try {
     const res = await window.api.initializeServer(targetDir, {
       source: selectedSource,
       zipPath,
-      serverName,
-      motd,
-      port,
-      maxPlayers,
-      gameMode,
+      serverName: wizardServerName.value.trim() || 'My Hytale Server',
+      motd: wizardMotd.value.trim() || 'Welcome to our Hytale server!',
+      port: parseInt(wizardPort.value, 10) || 5520,
+      maxPlayers: parseInt(wizardMaxPlayers.value, 10) || 20,
+      gameMode: wizardGameMode.value,
     });
 
     if (res.success) {
-      showToast(`Hytale Server successfully installed in ${targetDir}!`, 'success');
+      showToast('Server is ready', 'success');
       installModal.classList.add('hidden');
-
-      // Refresh app view with newly initialized server
       appConfig.serverDir = targetDir;
-      dashServerDir.textContent = targetDir;
-      settingsServerDir.value = targetDir;
-
-      await checkServerVersion();
-      await loadInstalledMods();
-      await refreshAccountStatus();
+      applyConfigToUI();
+      await Promise.all([checkServerVersion(), loadInstalledMods(false), refreshAccountStatus()]);
     } else {
-      showToast(`Installation failed: ${res.error}`, 'error');
+      showToast(`Setup failed: ${res.error}`, 'error');
       wizardBtnStart.disabled = false;
     }
   } catch (err) {
-    showToast(`Installation error: ${err.message}`, 'error');
+    showToast(`Setup error: ${err.message}`, 'error');
     wizardBtnStart.disabled = false;
   } finally {
-    unlistenProgress();
+    unlisten();
   }
 });
 
-// ==========================================
-// INSTALLED MODS MANAGEMENT
-// ==========================================
+// ============================================================================
+// Installed Mods (Library)
+// ============================================================================
 async function loadInstalledMods(checkRemoteUpdates = true) {
   try {
-    installedModsList.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">⏳</div>
-        <p>Scanning installed mods...</p>
-      </div>`;
+    if (currentInstalledMods.length === 0) {
+      installedModsList.innerHTML = `<div class="empty"><div class="empty-sub">Scanning mods…</div></div>`;
+    }
 
     const mods = await window.api.getInstalledMods(checkRemoteUpdates);
-    currentInstalledMods = mods;
+    currentInstalledMods = mods || [];
 
-    // Update stats
-    const total = mods.length;
-    const enabled = mods.filter((m) => m.isEnabled).length;
-    const updates = mods.filter((m) => m.updateAvailable).length;
+    const total = currentInstalledMods.length;
+    const enabled = currentInstalledMods.filter((m) => m.isEnabled).length;
+    const disabled = total - enabled;
+    const updates = currentInstalledMods.filter((m) => m.updateAvailable).length;
 
     statTotalMods.textContent = total;
     statEnabledMods.textContent = enabled;
     statUpdatesMods.textContent = updates;
-    installedModsCountBadge.textContent = total;
+    statUpdatesMods.closest('.stat')?.classList.toggle('has-updates', updates > 0);
+    navModsCount.textContent = total;
+
+    const counts = { all: total, enabled, disabled, updates };
+    modsFilter.querySelectorAll('[data-count]').forEach((el) => {
+      const k = el.dataset.count;
+      el.textContent = counts[k] ? `${counts[k]}` : '';
+    });
 
     if (updates > 0) {
       btnUpdateAllMods.classList.remove('hidden');
-      btnUpdateAllMods.textContent = `⚡ Update All (${updates})`;
+      btnUpdateAllMods.querySelector('span').textContent = `Update all (${updates})`;
     } else {
       btnUpdateAllMods.classList.add('hidden');
     }
 
     renderInstalledModsList();
   } catch (e) {
-    installedModsList.innerHTML = `<div class="empty-state"><p class="text-danger">Failed to scan mods: ${e.message}</p></div>`;
+    installedModsList.innerHTML = `<div class="empty"><div class="empty-title">Could not read mods</div><div class="empty-sub">${escapeHtml(e.message)}</div></div>`;
   }
 }
 
 function renderInstalledModsList() {
   const query = modsSearchInput.value.trim().toLowerCase();
-  const filter = modsFilterStatus.value;
 
-  let filtered = currentInstalledMods.filter((m) => {
+  const filtered = currentInstalledMods.filter((m) => {
     if (query) {
-      const nameMatch = (m.manifest.name || '').toLowerCase().includes(query);
-      const fileMatch = m.fileName.toLowerCase().includes(query);
-      const descMatch = (m.manifest.description || '').toLowerCase().includes(query);
+      const nameMatch = (m.manifest?.name || '').toLowerCase().includes(query);
+      const fileMatch = (m.fileName || '').toLowerCase().includes(query);
+      const descMatch = (m.manifest?.description || '').toLowerCase().includes(query);
       if (!nameMatch && !fileMatch && !descMatch) return false;
     }
-
-    if (filter === 'enabled') return m.isEnabled;
-    if (filter === 'disabled') return !m.isEnabled;
-    if (filter === 'updates') return m.updateAvailable;
+    if (currentModsFilter === 'enabled') return m.isEnabled;
+    if (currentModsFilter === 'disabled') return !m.isEnabled;
+    if (currentModsFilter === 'updates') return m.updateAvailable;
     return true;
   });
 
   if (filtered.length === 0) {
+    const emptyMsg =
+      currentInstalledMods.length === 0
+        ? 'No mods installed yet. Browse CurseForge or Thunderstore to add mods.'
+        : 'No mods match your current filter.';
     installedModsList.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📦</div>
-        <p>No matching mods found.</p>
+      <div class="empty">
+        <div class="empty-title">${currentInstalledMods.length === 0 ? 'Your library is empty' : 'No matches'}</div>
+        <div class="empty-sub">${escapeHtml(emptyMsg)}</div>
       </div>`;
     return;
   }
 
   installedModsList.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
   filtered.forEach((m) => {
-    const card = document.createElement('div');
-    card.className = 'mod-row-card';
+    const row = document.createElement('div');
+    row.className = `mod-row${m.isEnabled ? '' : ' is-disabled'}`;
 
-    const sourceBadge =
+    const sourceTag =
       m.source === 'curseforge'
-        ? '<span class="badge badge-warning">CurseForge</span>'
+        ? '<span class="tag tag-warning">CurseForge</span>'
         : m.source === 'thunderstore'
-        ? '<span class="badge badge-info">Thunderstore</span>'
-        : '<span class="badge badge-offline">Local</span>';
+        ? '<span class="tag tag-info">Thunderstore</span>'
+        : '';
 
-    const updateBadge = m.updateAvailable
-      ? `<span class="badge badge-warning">Update Available</span>`
-      : '';
+    const updateTag = m.updateAvailable ? '<span class="tag tag-success">Update available</span>' : '';
+    const authors = (m.manifest?.authors || []).map((a) => (typeof a === 'string' ? a : a.Name)).filter(Boolean).join(', ');
 
-    const authors = (m.manifest.authors || []).map((a) => (typeof a === 'string' ? a : a.Name)).join(', ');
-
-    card.innerHTML = `
-      <div class="mod-toggle-col">
-        <label class="switch">
-          <input type="checkbox" class="mod-toggle-cb" data-file="${m.fileName}" ${m.isEnabled ? 'checked' : ''}>
-          <span class="slider"></span>
-        </label>
-      </div>
-
-      <div class="mod-info-col">
-        <div class="mod-title-row">
-          <span class="mod-name">${escapeHtml(m.manifest.name)}</span>
-          <span class="mod-ver">v${escapeHtml(m.manifest.version)}</span>
-          ${sourceBadge}
-          ${updateBadge}
+    row.innerHTML = `
+      <label class="switch" title="${m.isEnabled ? 'Enabled' : 'Disabled'}">
+        <input type="checkbox" class="mod-toggle-cb" ${m.isEnabled ? 'checked' : ''}>
+        <span class="switch-track"></span>
+      </label>
+      <div class="mod-row-main">
+        <div class="mod-row-head">
+          <span class="mod-row-name">${escapeHtml(m.manifest?.name || m.fileName)}</span>
+          <span class="mod-row-ver">v${escapeHtml(m.manifest?.version || '1.0.0')}</span>
+          ${sourceTag}
+          ${updateTag}
         </div>
-        <div class="mod-desc">${escapeHtml(m.manifest.description || 'No description provided.')}</div>
-        <div class="mod-meta-row">
-          <span>File: <code>${escapeHtml(m.fileName)}</code></span>
-          <span>Size: ${(m.size / 1024).toFixed(0)} KB</span>
-          ${authors ? `<span>By: ${escapeHtml(authors)}</span>` : ''}
+        ${m.manifest?.description ? `<div class="mod-row-desc">${escapeHtml(m.manifest.description)}</div>` : ''}
+        <div class="mod-row-meta">
+          <span class="mono">${escapeHtml(m.fileName)}</span>
+          <span>${Math.max(1, Math.round((m.size || 0) / 1024))} KB</span>
+          ${authors ? `<span>by ${escapeHtml(authors)}</span>` : ''}
         </div>
       </div>
-
-      <div class="mod-actions-col">
+      <div class="mod-row-actions">
         ${
           m.updateAvailable
-            ? `<button class="btn btn-accent btn-sm btn-update-mod" data-file="${m.fileName}">Update</button>`
+            ? `<button class="btn btn-primary btn-sm btn-update-mod"><svg class="ic"><use href="#i-update"/></svg><span>Update</span></button>`
             : ''
         }
-        <button class="btn btn-danger btn-sm btn-delete-mod" data-file="${m.fileName}" title="Delete mod">🗑️</button>
+        <button class="icon-btn danger btn-delete-mod" title="Remove mod" aria-label="Remove mod">
+          <svg class="ic"><use href="#i-trash"/></svg>
+        </button>
       </div>
     `;
 
-    // Toggle listener
-    card.querySelector('.mod-toggle-cb').addEventListener('change', async (e) => {
+    row.querySelector('.mod-toggle-cb').addEventListener('change', async (e) => {
       const enable = e.target.checked;
       try {
         await window.api.setModEnabled(m.fileName, enable);
-        showToast(`${m.manifest.name} ${enable ? 'enabled' : 'disabled'}`, 'success');
         await loadInstalledMods(false);
       } catch (err) {
-        showToast(`Failed to toggle: ${err.message}`, 'error');
+        showToast(`Failed to toggle mod: ${err.message}`, 'error');
         e.target.checked = !enable;
       }
     });
 
-    // Update listener
-    const updateBtn = card.querySelector('.btn-update-mod');
+    const updateBtn = row.querySelector('.btn-update-mod');
     if (updateBtn) {
       updateBtn.addEventListener('click', async () => {
         updateBtn.disabled = true;
-        updateBtn.textContent = 'Updating...';
+        updateBtn.textContent = 'Updating…';
         try {
           const res = await window.api.updateMod(m);
           if (res.success) {
-            showToast(`Updated ${m.manifest.name}!`, 'success');
+            showToast(`Updated ${m.manifest?.name || m.fileName}`, 'success');
             await loadInstalledMods(true);
           } else {
             showToast(`Update failed: ${res.error}`, 'error');
@@ -693,60 +867,107 @@ function renderInstalledModsList() {
       });
     }
 
-    // Delete listener
-    card.querySelector('.btn-delete-mod').addEventListener('click', async () => {
-      if (confirm(`Are you sure you want to delete ${m.manifest.name} (${m.fileName})?`)) {
-        try {
-          await window.api.deleteMod(m.fileName, false);
-          showToast(`Deleted ${m.manifest.name}`, 'info');
-          await loadInstalledMods(false);
-        } catch (err) {
-          showToast(`Delete failed: ${err.message}`, 'error');
-        }
+    row.querySelector('.btn-delete-mod').addEventListener('click', async () => {
+      const ok = await confirmDialog({
+        title: `Remove ${m.manifest?.name || m.fileName}?`,
+        message: `This will delete ${m.fileName} from your server's mods folder.`,
+        confirmLabel: 'Remove',
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await window.api.deleteMod(m.fileName, false);
+        showToast(`Removed ${m.manifest?.name || m.fileName}`, 'info');
+        await loadInstalledMods(false);
+      } catch (err) {
+        showToast(`Remove failed: ${err.message}`, 'error');
       }
     });
 
-    installedModsList.appendChild(card);
+    frag.appendChild(row);
   });
+
+  installedModsList.appendChild(frag);
 }
 
 modsSearchInput.addEventListener('input', renderInstalledModsList);
-modsFilterStatus.addEventListener('change', renderInstalledModsList);
-btnRefreshInstalledMods.addEventListener('click', () => loadInstalledMods(true));
-btnDashOpenMods.addEventListener('click', () => switchTab('installed-mods'));
+
+modsFilter.querySelectorAll('button[data-value]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    currentModsFilter = btn.dataset.value;
+    setSegmentedValue(modsFilter, currentModsFilter);
+    renderInstalledModsList();
+  });
+});
+
+btnRefreshInstalledMods.addEventListener('click', async () => {
+  await loadInstalledMods(true);
+  showToast('Library refreshed', 'info');
+});
 
 btnOpenModsFolder.addEventListener('click', () => {
-  if (appConfig?.serverDir) {
-    window.api.openPath(`${appConfig.serverDir}\\mods`);
-  }
+  if (appConfig?.serverDir) window.api.openPath(`${appConfig.serverDir}\\mods`);
 });
 
 btnUpdateAllMods.addEventListener('click', async () => {
   const toUpdate = currentInstalledMods.filter((m) => m.updateAvailable);
   if (toUpdate.length === 0) return;
-  if (!confirm(`Update all ${toUpdate.length} available mod updates?`)) return;
 
   btnUpdateAllMods.disabled = true;
   for (const m of toUpdate) {
     try {
-      showToast(`Updating ${m.manifest.name}...`, 'info');
       await window.api.updateMod(m);
     } catch (e) {
-      showToast(`Failed ${m.manifest.name}: ${e.message}`, 'error');
+      showToast(`Failed ${m.manifest?.name}: ${e.message}`, 'error');
     }
   }
   btnUpdateAllMods.disabled = false;
+  showToast(`Updated ${toUpdate.length} mod(s)`, 'success');
   await loadInstalledMods(true);
 });
 
-// ==========================================
-// CURSEFORGE BROWSER
-// ==========================================
+// ============================================================================
+// Unified Browse (CurseForge + Thunderstore)
+// ============================================================================
+function setBrowseSource(source) {
+  currentBrowseSource = source;
+  setSegmentedValue(browseSource, source);
+
+  const isCf = source === 'curseforge';
+  browseCf.classList.toggle('hidden', !isCf);
+  cfCategorySelect.classList.toggle('hidden', !isCf);
+  cfSortSelect.classList.toggle('hidden', !isCf);
+
+  browseTs.classList.toggle('hidden', isCf);
+  tsSortSelect.classList.toggle('hidden', isCf);
+
+  if (isCf) {
+    if (!cfLoadedOnce) loadCurseForgeMods();
+  } else {
+    if (!tsLoadedOnce) loadThunderstoreMods();
+  }
+}
+
+browseSource.querySelectorAll('button[data-value]').forEach((btn) => {
+  btn.addEventListener('click', () => setBrowseSource(btn.dataset.value));
+});
+
+const triggerBrowseSearch = debounce(() => {
+  if (currentBrowseSource === 'curseforge') {
+    cfPageIndex = 0;
+    loadCurseForgeMods();
+  } else {
+    loadThunderstoreMods();
+  }
+}, 280);
+
+browseSearchInput.addEventListener('input', triggerBrowseSearch);
+
 async function loadCfCategories() {
   try {
     const cats = await window.api.getCfCategories();
-    cfCategorySelect.innerHTML = '<option value="">All Categories</option>';
-    cats.forEach((c) => {
+    cfCategorySelect.innerHTML = '<option value="">All categories</option>';
+    (cats || []).forEach((c) => {
       const opt = document.createElement('option');
       opt.value = c.id;
       opt.textContent = c.name;
@@ -755,15 +976,15 @@ async function loadCfCategories() {
   } catch {}
 }
 
+function renderSkeletonCards(container, count = 6) {
+  container.innerHTML = Array.from({ length: count }, () => '<div class="skeleton-card"></div>').join('');
+}
+
 async function loadCurseForgeMods() {
   try {
-    cfResultsGrid.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">⏳</div>
-        <p>Loading CurseForge mods...</p>
-      </div>`;
+    renderSkeletonCards(cfResultsGrid, 6);
 
-    const searchFilter = cfSearchInput.value.trim();
+    const searchFilter = browseSearchInput.value.trim();
     const sortField = parseInt(cfSortSelect.value, 10);
     const categoryId = cfCategorySelect.value ? parseInt(cfCategorySelect.value, 10) : null;
 
@@ -775,130 +996,114 @@ async function loadCurseForgeMods() {
       index: cfPageIndex * CF_PAGE_SIZE,
     });
 
+    cfLoadedOnce = true;
     const mods = res.data || [];
     const total = res.pagination?.totalCount || 0;
-    const maxPages = Math.ceil(total / CF_PAGE_SIZE);
+    const maxPages = Math.max(1, Math.ceil(total / CF_PAGE_SIZE));
 
-    cfPageInfo.textContent = `Page ${cfPageIndex + 1} of ${Math.max(1, maxPages)}`;
+    cfPageInfo.textContent = `Page ${cfPageIndex + 1} of ${maxPages}`;
     cfPrevPage.disabled = cfPageIndex === 0;
     cfNextPage.disabled = cfPageIndex >= maxPages - 1;
 
     if (mods.length === 0) {
       cfResultsGrid.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">🔍</div>
-          <p>No CurseForge mods found matching your query.</p>
+        <div class="empty">
+          <div class="empty-title">No mods found</div>
+          <div class="empty-sub">Try a different search term or category.</div>
         </div>`;
       return;
     }
 
     cfResultsGrid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
     mods.forEach((mod) => {
       const card = document.createElement('div');
-      card.className = 'mod-grid-card';
+      card.className = 'mod-card is-clickable';
 
-      const avatar = mod.logo?.thumbnailUrl
-        ? `<img class="mod-avatar" src="${mod.logo.thumbnailUrl}" alt="">`
-        : `<div class="mod-avatar-placeholder">⚔️</div>`;
+      const initial = (mod.name || 'M').charAt(0).toUpperCase();
+      const avatarHtml = mod.logo?.thumbnailUrl
+        ? `<img src="${escapeHtml(mod.logo.thumbnailUrl)}" alt="" loading="lazy">`
+        : escapeHtml(initial);
 
       const authorName = (mod.authors || []).map((a) => a.name).join(', ') || 'Unknown';
-      const downloads = mod.downloadCount ? formatNumber(mod.downloadCount) : '0';
-      const latestFile = mod.latestFiles && mod.latestFiles.length > 0 ? mod.latestFiles[0] : null;
+      const downloads = formatNumber(mod.downloadCount);
+      const latestFile = mod.latestFiles?.[0] || null;
 
-      // Check if installed locally
       const installedMatch = currentInstalledMods.find(
-        (m) =>
-          m.remoteId === mod.id ||
-          m.manifest.name.toLowerCase() === mod.name.toLowerCase()
+        (m) => m.remoteId === mod.id || (m.manifest?.name || '').toLowerCase() === (mod.name || '').toLowerCase()
       );
 
-      let actionBtnText = 'Install';
-      let actionBtnClass = 'btn-primary';
-      let isInstalled = false;
-
+      let btnLabel = 'Install';
+      let btnClass = 'btn-primary';
+      const canInstall = !installedMatch || installedMatch.updateAvailable;
       if (installedMatch) {
-        isInstalled = true;
-        if (installedMatch.updateAvailable) {
-          actionBtnText = 'Update';
-          actionBtnClass = 'btn-accent';
-        } else {
-          actionBtnText = 'Installed ✓';
-          actionBtnClass = 'btn-secondary';
-        }
+        btnLabel = installedMatch.updateAvailable ? 'Update' : 'Installed';
+        btnClass = installedMatch.updateAvailable ? 'btn-primary' : 'btn-ghost';
       }
 
       card.innerHTML = `
-        <div class="mod-grid-top">
-          ${avatar}
-          <div class="mod-grid-title-area">
-            <div class="mod-grid-title" title="${escapeHtml(mod.name)}">${escapeHtml(mod.name)}</div>
-            <div class="mod-grid-author">By ${escapeHtml(authorName)}</div>
+        <div class="mod-card-head">
+          <div class="mod-avatar">${avatarHtml}</div>
+          <div class="mod-card-titles">
+            <div class="mod-card-name" title="${escapeHtml(mod.name)}">${escapeHtml(mod.name)}</div>
+            <div class="mod-card-by">by ${escapeHtml(authorName)}</div>
           </div>
         </div>
-        <div class="mod-grid-summary">${escapeHtml(mod.summary || 'No summary available.')}</div>
-        <div class="mod-grid-stats">
-          <span>📥 ${downloads} dl</span>
-          <span>${latestFile ? `v${escapeHtml(latestFile.displayName || latestFile.fileName)}` : ''}</span>
-        </div>
-        <div class="mod-grid-footer">
-          <button class="btn btn-secondary btn-sm btn-cf-details">Details</button>
-          <button class="btn ${actionBtnClass} btn-sm btn-cf-install" ${isInstalled && !installedMatch?.updateAvailable ? 'disabled' : ''}>${actionBtnText}</button>
+        <div class="mod-card-desc">${escapeHtml(mod.summary || 'No description provided.')}</div>
+        <div class="mod-card-foot">
+          <span class="mod-card-stat">
+            <svg class="ic"><use href="#i-download"/></svg>
+            <span>${downloads}</span>
+          </span>
+          <button class="btn ${btnClass} btn-sm btn-cf-install" ${canInstall ? '' : 'disabled'}>${btnLabel}</button>
         </div>
       `;
 
-      // Details button
-      card.querySelector('.btn-cf-details').addEventListener('click', async () => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-cf-install')) return;
         openModModal(mod, latestFile);
       });
 
-      // Install button
       const installBtn = card.querySelector('.btn-cf-install');
-      if (installBtn && (!isInstalled || installedMatch?.updateAvailable)) {
-        installBtn.addEventListener('click', async () => {
+      if (installBtn && canInstall) {
+        installBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
           if (!latestFile) {
-            showToast('No downloadable file available for this mod', 'error');
+            showToast('No downloadable file found for this mod', 'error');
             return;
           }
           installBtn.disabled = true;
-          installBtn.textContent = 'Installing...';
-
+          installBtn.textContent = 'Installing…';
           try {
-            const res = await window.api.installCfMod(mod, latestFile, true);
-            if (res.success) {
-              showToast(`Installed ${mod.name}!`, 'success');
-              installBtn.textContent = 'Installed ✓';
-              installBtn.className = 'btn btn-secondary btn-sm';
+            const r = await window.api.installCfMod(mod, latestFile, true);
+            if (r.success) {
+              showToast(`Installed ${mod.name}`, 'success');
+              installBtn.textContent = 'Installed';
+              installBtn.className = 'btn btn-ghost btn-sm';
               await loadInstalledMods(false);
             } else {
-              showToast(`Install failed: ${res.error}`, 'error');
+              showToast(`Install failed: ${r.error}`, 'error');
               installBtn.disabled = false;
-              installBtn.textContent = actionBtnText;
+              installBtn.textContent = btnLabel;
             }
           } catch (err) {
             showToast(`Install error: ${err.message}`, 'error');
             installBtn.disabled = false;
-            installBtn.textContent = actionBtnText;
+            installBtn.textContent = btnLabel;
           }
         });
       }
 
-      cfResultsGrid.appendChild(card);
+      frag.appendChild(card);
     });
+
+    cfResultsGrid.appendChild(frag);
   } catch (e) {
-    cfResultsGrid.innerHTML = `<div class="empty-state"><p class="text-danger">Failed to search CurseForge: ${e.message}</p></div>`;
+    cfResultsGrid.innerHTML = `<div class="empty"><div class="empty-title">CurseForge unavailable</div><div class="empty-sub">${escapeHtml(e.message)}</div></div>`;
   }
 }
 
-btnCfSearch.addEventListener('click', () => {
-  cfPageIndex = 0;
-  loadCurseForgeMods();
-});
-cfSearchInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    cfPageIndex = 0;
-    loadCurseForgeMods();
-  }
-});
 cfSortSelect.addEventListener('change', () => {
   cfPageIndex = 0;
   loadCurseForgeMods();
@@ -907,7 +1112,6 @@ cfCategorySelect.addEventListener('change', () => {
   cfPageIndex = 0;
   loadCurseForgeMods();
 });
-
 cfPrevPage.addEventListener('click', () => {
   if (cfPageIndex > 0) {
     cfPageIndex--;
@@ -919,67 +1123,59 @@ cfNextPage.addEventListener('click', () => {
   loadCurseForgeMods();
 });
 
-// ==========================================
-// THUNDERSTORE BROWSER
-// ==========================================
 async function loadThunderstoreMods() {
   try {
-    tsResultsGrid.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">⏳</div>
-        <p>Loading Thunderstore packages for Hytale...</p>
-      </div>`;
-
-    const searchFilter = tsSearchInput.value.trim();
-    const sort = tsSortSelect.value;
+    renderSkeletonCards(tsResultsGrid, 6);
 
     const pkgs = await window.api.searchThunderstore({
-      searchFilter,
-      sort,
+      searchFilter: browseSearchInput.value.trim(),
+      sort: tsSortSelect.value,
     });
 
-    if (pkgs.length === 0) {
+    tsLoadedOnce = true;
+
+    if (!pkgs || pkgs.length === 0) {
       tsResultsGrid.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">⚡</div>
-          <p>No Thunderstore packages found.</p>
+        <div class="empty">
+          <div class="empty-title">No Thunderstore packages found</div>
+          <div class="empty-sub">No community packages matched your filter.</div>
         </div>`;
       return;
     }
 
     tsResultsGrid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
     pkgs.forEach((pkg) => {
       const card = document.createElement('div');
-      card.className = 'mod-grid-card';
+      card.className = 'mod-card';
 
-      const avatar = pkg.icon_url
-        ? `<img class="mod-avatar" src="${pkg.icon_url}" alt="">`
-        : `<div class="mod-avatar-placeholder">⚡</div>`;
-
-      const downloads = pkg.download_count ? formatNumber(pkg.download_count) : '0';
+      const initial = (pkg.name || 'T').charAt(0).toUpperCase();
+      const avatarHtml = pkg.icon_url ? `<img src="${escapeHtml(pkg.icon_url)}" alt="" loading="lazy">` : escapeHtml(initial);
+      const downloads = formatNumber(pkg.download_count);
 
       const isInstalled = currentInstalledMods.some(
         (m) =>
           m.remoteId === `${pkg.namespace}/${pkg.name}` ||
-          m.manifest.name.toLowerCase() === pkg.name.toLowerCase()
+          (m.manifest?.name || '').toLowerCase() === (pkg.name || '').toLowerCase()
       );
 
       card.innerHTML = `
-        <div class="mod-grid-top">
-          ${avatar}
-          <div class="mod-grid-title-area">
-            <div class="mod-grid-title" title="${escapeHtml(pkg.name)}">${escapeHtml(pkg.name)}</div>
-            <div class="mod-grid-author">By ${escapeHtml(pkg.namespace)}</div>
+        <div class="mod-card-head">
+          <div class="mod-avatar">${avatarHtml}</div>
+          <div class="mod-card-titles">
+            <div class="mod-card-name" title="${escapeHtml(pkg.name)}">${escapeHtml(pkg.name)}</div>
+            <div class="mod-card-by">by ${escapeHtml(pkg.namespace)}</div>
           </div>
         </div>
-        <div class="mod-grid-summary">${escapeHtml(pkg.description || 'No description.')}</div>
-        <div class="mod-grid-stats">
-          <span>📥 ${downloads} dl</span>
-          <span>${pkg.categories ? pkg.categories.map((c) => c.name).join(', ') : ''}</span>
-        </div>
-        <div class="mod-grid-footer">
-          <button class="btn ${isInstalled ? 'btn-secondary' : 'btn-primary'} btn-sm btn-ts-install" ${isInstalled ? 'disabled' : ''}>
-            ${isInstalled ? 'Installed ✓' : 'Install'}
+        <div class="mod-card-desc">${escapeHtml(pkg.description || 'No description provided.')}</div>
+        <div class="mod-card-foot">
+          <span class="mod-card-stat">
+            <svg class="ic"><use href="#i-download"/></svg>
+            <span>${downloads}</span>
+          </span>
+          <button class="btn ${isInstalled ? 'btn-ghost' : 'btn-primary'} btn-sm btn-ts-install" ${isInstalled ? 'disabled' : ''}>
+            ${isInstalled ? 'Installed' : 'Install'}
           </button>
         </div>
       `;
@@ -988,13 +1184,13 @@ async function loadThunderstoreMods() {
       if (installBtn && !isInstalled) {
         installBtn.addEventListener('click', async () => {
           installBtn.disabled = true;
-          installBtn.textContent = 'Installing...';
+          installBtn.textContent = 'Installing…';
           try {
             const res = await window.api.installThunderstore(pkg);
             if (res.success) {
-              showToast(`Installed ${pkg.name}!`, 'success');
-              installBtn.textContent = 'Installed ✓';
-              installBtn.className = 'btn btn-secondary btn-sm';
+              showToast(`Installed ${pkg.name}`, 'success');
+              installBtn.textContent = 'Installed';
+              installBtn.className = 'btn btn-ghost btn-sm';
               await loadInstalledMods(false);
             } else {
               showToast(`Install failed: ${res.error}`, 'error');
@@ -1009,93 +1205,124 @@ async function loadThunderstoreMods() {
         });
       }
 
-      tsResultsGrid.appendChild(card);
+      frag.appendChild(card);
     });
+
+    tsResultsGrid.appendChild(frag);
   } catch (e) {
-    tsResultsGrid.innerHTML = `<div class="empty-state"><p class="text-danger">Failed to search Thunderstore: ${e.message}</p></div>`;
+    tsResultsGrid.innerHTML = `<div class="empty"><div class="empty-title">Thunderstore unavailable</div><div class="empty-sub">${escapeHtml(e.message)}</div></div>`;
   }
 }
 
-btnTsSearch.addEventListener('click', loadThunderstoreMods);
-btnTsRefresh.addEventListener('click', loadThunderstoreMods);
-tsSearchInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') loadThunderstoreMods();
-});
 tsSortSelect.addEventListener('change', loadThunderstoreMods);
 
-// ==========================================
-// MOD DETAILS MODAL
-// ==========================================
+// ============================================================================
+// Mod Details Modal
+// ============================================================================
 async function openModModal(mod, latestFile) {
   modalModTitle.textContent = mod.name;
-  modalModContent.innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Loading description...</p></div>';
+  const authorName = (mod.authors || []).map((a) => a.name).join(', ') || 'Unknown';
+  modalModMeta.textContent = `by ${authorName} · ${formatNumber(mod.downloadCount)} downloads`;
+  modalModAvatar.innerHTML = mod.logo?.thumbnailUrl
+    ? `<img src="${escapeHtml(mod.logo.thumbnailUrl)}" alt="">`
+    : escapeHtml((mod.name || 'M').charAt(0).toUpperCase());
+
+  modalModContent.innerHTML = '<div class="empty"><div class="empty-sub">Loading description…</div></div>';
   modModal.classList.remove('hidden');
 
-  try {
-    const desc = await window.api.getCfDescription(mod.id);
-    modalModContent.innerHTML = desc || mod.summary || 'No detailed description available.';
-  } catch {
-    modalModContent.innerHTML = mod.summary || 'Failed to load full description.';
-  }
-
   modalModFooter.innerHTML = `
-    <button class="btn btn-secondary" id="modal-close-action">Close</button>
-    <button class="btn btn-primary" id="modal-install-action">Install Mod</button>
+    <button class="btn btn-ghost" id="modal-close-action">Close</button>
+    <button class="btn btn-primary" id="modal-install-action" ${latestFile ? '' : 'disabled'}>Install</button>
   `;
 
-  document.getElementById('modal-close-action').addEventListener('click', () => {
-    modModal.classList.add('hidden');
-  });
-
-  document.getElementById('modal-install-action').addEventListener('click', async () => {
+  $('modal-close-action').addEventListener('click', () => modModal.classList.add('hidden'));
+  $('modal-install-action').addEventListener('click', async (e) => {
     if (!latestFile) return;
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Installing…';
     try {
       const res = await window.api.installCfMod(mod, latestFile, true);
       if (res.success) {
-        showToast(`Installed ${mod.name}!`, 'success');
+        showToast(`Installed ${mod.name}`, 'success');
         modModal.classList.add('hidden');
         await loadInstalledMods(false);
+        if (currentBrowseSource === 'curseforge') loadCurseForgeMods();
       } else {
         showToast(`Install failed: ${res.error}`, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Install';
       }
-    } catch (e) {
-      showToast(`Install error: ${e.message}`, 'error');
+    } catch (err) {
+      showToast(`Install error: ${err.message}`, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Install';
     }
   });
+
+  try {
+    const desc = await window.api.getCfDescription(mod.id);
+    modalModContent.innerHTML = desc || escapeHtml(mod.summary || 'No description available.');
+  } catch {
+    modalModContent.textContent = mod.summary || 'Could not load description.';
+  }
 }
 
 modalCloseBtn.addEventListener('click', () => modModal.classList.add('hidden'));
 
-// ==========================================
-// PROFILES
-// ==========================================
+// Close modals on backdrop click
+[modModal, installModal].forEach((m) => {
+  m.addEventListener('click', (e) => {
+    if (e.target === m) m.classList.add('hidden');
+  });
+});
+
+// ============================================================================
+// Profiles
+// ============================================================================
+async function loadProfilesCount() {
+  try {
+    const profiles = await window.api.getProfiles();
+    statActiveProfiles.textContent = (profiles || []).length;
+    const active = (profiles || []).find((p) => p.active);
+    if (active) dashActiveProfile.textContent = active.name;
+  } catch {}
+}
+
 async function loadProfiles() {
   try {
-    profilesList.innerHTML = '<div class="empty-state"><p>Loading profiles...</p></div>';
     const profiles = await window.api.getProfiles();
+    statActiveProfiles.textContent = (profiles || []).length;
+
+    if (!profiles || profiles.length === 0) {
+      profilesList.innerHTML = `
+        <div class="empty">
+          <div class="empty-title">No profiles saved yet</div>
+          <div class="empty-sub">Create a profile to snapshot your current mod configuration.</div>
+        </div>`;
+      return;
+    }
 
     profilesList.innerHTML = '';
-    statActiveProfiles.textContent = profiles.length;
-
     profiles.forEach((p) => {
-      const card = document.createElement('div');
-      card.className = `profile-card ${p.active ? 'active-profile' : ''}`;
+      if (p.active) dashActiveProfile.textContent = p.name;
 
+      const card = document.createElement('div');
+      card.className = 'mod-card';
       card.innerHTML = `
-        <div class="profile-card-header">
-          <span class="profile-card-title">${escapeHtml(p.name)}</span>
-          ${p.active ? '<span class="badge badge-success">Active</span>' : ''}
+        <div class="mod-card-head">
+          <div class="mod-card-titles">
+            <div class="mod-card-name">${escapeHtml(p.name)}</div>
+            <div class="mod-card-by">${p.modCount || 0} mod(s)</div>
+          </div>
+          ${p.active ? '<span class="tag tag-success">Active</span>' : ''}
         </div>
-        <div class="profile-card-desc">${escapeHtml(p.description || 'Configured mod profile snapshot.')}</div>
-        <div class="info-row">
-          <span class="info-label">Mods Count:</span>
-          <span class="info-value">${p.modCount || 0}</span>
-        </div>
-        <div class="profile-card-footer">
-          <button class="btn ${p.active ? 'btn-secondary' : 'btn-primary'} btn-sm btn-activate-profile" ${p.active ? 'disabled' : ''}>
-            ${p.active ? 'Active' : 'Activate'}
+        <div class="mod-card-desc">${escapeHtml(p.description || 'Saved mod profile snapshot.')}</div>
+        <div class="mod-card-foot">
+          <button class="btn btn-ghost btn-sm btn-export-profile">Export</button>
+          <button class="btn ${p.active ? 'btn-ghost' : 'btn-primary'} btn-sm btn-activate-profile" ${p.active ? 'disabled' : ''}>
+            ${p.active ? 'Active' : 'Switch to profile'}
           </button>
-          <button class="btn btn-secondary btn-sm btn-export-profile">Export</button>
         </div>
       `;
 
@@ -1103,20 +1330,17 @@ async function loadProfiles() {
         try {
           await window.api.activateProfile(p.name);
           dashActiveProfile.textContent = p.name;
-          showToast(`Activated profile ${p.name}!`, 'success');
-          await loadProfiles();
-          await loadInstalledMods(false);
+          showToast(`Switched to ${p.name}`, 'success');
+          await Promise.all([loadProfiles(), loadInstalledMods(false)]);
         } catch (e) {
-          showToast(`Failed to activate: ${e.message}`, 'error');
+          showToast(`Failed to switch profile: ${e.message}`, 'error');
         }
       });
 
       card.querySelector('.btn-export-profile').addEventListener('click', async () => {
         try {
           const res = await window.api.exportProfileDialog(p.name);
-          if (res.success) {
-            showToast(`Exported profile to ${res.path}!`, 'success');
-          }
+          if (res.success) showToast(`Exported to ${res.path}`, 'success');
         } catch (e) {
           showToast(`Export failed: ${e.message}`, 'error');
         }
@@ -1125,17 +1349,25 @@ async function loadProfiles() {
       profilesList.appendChild(card);
     });
   } catch (e) {
-    profilesList.innerHTML = `<div class="empty-state"><p class="text-danger">Failed to load profiles: ${e.message}</p></div>`;
+    profilesList.innerHTML = `<div class="empty"><div class="empty-title">Failed to load profiles</div><div class="empty-sub">${escapeHtml(e.message)}</div></div>`;
   }
 }
 
 btnCreateProfile.addEventListener('click', async () => {
-  const name = prompt('Enter a name for the new profile:');
-  if (!name) return;
-  const desc = prompt('Enter a short description (optional):') || '';
+  const res = await promptDialog({
+    title: 'New profile',
+    message: 'Snapshots your currently enabled and disabled mods.',
+    fields: [
+      { name: 'name', label: 'Name', placeholder: 'e.g. Vanilla+ Survival' },
+      { name: 'desc', label: 'Description (optional)', placeholder: 'Short note about this setup' },
+    ],
+    confirmLabel: 'Create profile',
+  });
+  if (!res || !res.name) return;
+
   try {
-    await window.api.createProfile(name, desc);
-    showToast(`Profile ${name} created!`, 'success');
+    await window.api.createProfile(res.name, res.desc || '');
+    showToast(`Created profile ${res.name}`, 'success');
     await loadProfiles();
   } catch (e) {
     showToast(`Failed to create profile: ${e.message}`, 'error');
@@ -1146,18 +1378,17 @@ btnImportProfile.addEventListener('click', async () => {
   try {
     const res = await window.api.importProfileDialog();
     if (res.success) {
-      showToast(`Imported profile ${res.profileName} (${res.downloadedCount} mods auto-downloaded)!`, 'success');
-      await loadProfiles();
-      await loadInstalledMods(false);
+      showToast(`Imported ${res.profileName}`, 'success');
+      await Promise.all([loadProfiles(), loadInstalledMods(false)]);
     }
   } catch (e) {
     showToast(`Import error: ${e.message}`, 'error');
   }
 });
 
-// ==========================================
-// SERVER CONSOLE & RUNNER
-// ==========================================
+// ============================================================================
+// Server Runner & Console (rAF-batched logs + smart auto-scroll)
+// ============================================================================
 async function refreshServerStatus() {
   try {
     const st = await window.api.getServerStatus();
@@ -1165,120 +1396,155 @@ async function refreshServerStatus() {
   } catch {}
 }
 
-function updateServerStatusUI(status) {
-  if (status.isRunning) {
-    sidebarServerBadge.className = 'badge badge-online';
-    sidebarServerBadge.textContent = 'Server Online';
-    quickServerBtn.textContent = '⏹ Stop Server';
-    quickServerBtn.className = 'btn btn-danger btn-sm';
-    if (consoleStatusDot) consoleStatusDot.className = 'console-dot dot-green';
-    if (consoleStatusBadge) {
-      consoleStatusBadge.className = 'badge badge-online';
-      consoleStatusBadge.textContent = status.isDetached ? `Detached (PID: ${status.pid})` : `Online (PID: ${status.pid})`;
+function setToggleButtonsState(running, busyText = null) {
+  [quickServerBtn, heroServerBtn].forEach((btn) => {
+    if (!btn) return;
+    if (busyText) {
+      btn.disabled = true;
+      btn.innerHTML = `<span>${escapeHtml(busyText)}</span>`;
+      return;
     }
+    btn.disabled = false;
+    if (running) {
+      btn.className = `btn btn-danger ${btn === quickServerBtn ? 'btn-sm ' : ''}server-toggle`;
+      btn.innerHTML = `<svg class="ic"><use href="#i-stop"/></svg><span>Stop</span>`;
+    } else {
+      btn.className = `btn btn-primary ${btn === quickServerBtn ? 'btn-sm ' : ''}server-toggle`;
+      btn.innerHTML = `<svg class="ic"><use href="#i-play"/></svg><span>Start</span>`;
+    }
+  });
+}
+
+function updateServerStatusUI(status) {
+  lastServerStatus = status || { isRunning: false };
+  const running = Boolean(status?.isRunning);
+  const mode = appConfig?.launchMode || 'integrated';
+
+  appEl.classList.toggle('is-running', running);
+  topbarStatus.classList.toggle('is-online', running);
+  topbarStatus.classList.toggle('is-offline', !running);
+  heroDot.classList.toggle('is-online', running);
+
+  setToggleButtonsState(running);
+
+  if (running) {
+    topbarStatusText.textContent = status.isDetached ? `Running · PID ${status.pid}` : 'Running';
+    heroLabel.textContent = 'Online';
+    heroSub.textContent = status.isDetached
+      ? `Running in separate window (PID ${status.pid})`
+      : `Running in app (PID ${status.pid})`;
+
+    consoleStatusBadge.className = 'tag tag-success';
+    consoleStatusBadge.textContent = status.isDetached ? `Separate window · PID ${status.pid}` : `Online · PID ${status.pid}`;
 
     if (status.isDetached) {
-      dashServerStatus.textContent = `Running (Independent Window - PID: ${status.pid})`;
-      if (detachedModeNotice) {
-        detachedModeNotice.classList.remove('hidden');
-        detachedModeNotice.innerHTML = `<span>💡</span><span><strong>Detached Mode Running:</strong> Hytale Server is active in an independent terminal window (PID: ${status.pid}). You can safely close or exit the Manager anytime without stopping your server!</span>`;
-      }
-      consoleInput.placeholder = 'Server is running in external console window. Use its terminal window for commands.';
+      detachedModeNotice.classList.remove('hidden');
+      detachedModeText.textContent = `Server is running in its own window (PID ${status.pid}). You can quit this app at any time without stopping the server.`;
+      consoleInput.placeholder = 'Commands are entered in the external server window';
       consoleInput.disabled = true;
     } else {
-      dashServerStatus.textContent = `Running (PID: ${status.pid})`;
-      if (detachedModeNotice) detachedModeNotice.classList.add('hidden');
-      consoleInput.placeholder = 'Type a server command (e.g. help, list, stop)...';
+      detachedModeNotice.classList.add('hidden');
+      consoleInput.placeholder = 'Type a command — try help or list';
       consoleInput.disabled = false;
     }
   } else {
-    sidebarServerBadge.className = 'badge badge-offline';
-    sidebarServerBadge.textContent = 'Server Offline';
-    quickServerBtn.textContent = '▶ Start Server';
-    quickServerBtn.className = 'btn btn-primary btn-sm';
-    dashServerStatus.textContent = 'Stopped';
-    if (consoleStatusDot) consoleStatusDot.className = 'console-dot dot-gray';
-    if (consoleStatusBadge) {
-      consoleStatusBadge.className = 'badge badge-offline';
-      consoleStatusBadge.textContent = 'Offline';
-    }
+    topbarStatusText.textContent = 'Stopped';
+    heroLabel.textContent = 'Offline';
+    heroSub.textContent = 'Server is not running';
+    consoleStatusBadge.className = 'tag';
+    consoleStatusBadge.textContent = 'Offline';
 
-    if (detachedModeNotice) {
-      if (consoleLaunchMode?.value === 'detached') {
-        detachedModeNotice.classList.remove('hidden');
-        detachedModeNotice.innerHTML = `<span>ℹ️</span><span><strong>Detached Mode Selected:</strong> When you start the server, it will open in a separate native terminal window, allowing you to close or exit the Manager without stopping your server.</span>`;
-      } else {
-        detachedModeNotice.classList.add('hidden');
-      }
+    if (mode === 'detached') {
+      detachedModeNotice.classList.remove('hidden');
+      detachedModeText.textContent = 'Separate window mode: starting the server opens an independent console window that stays alive if you close this app.';
+    } else {
+      detachedModeNotice.classList.add('hidden');
     }
-    consoleInput.placeholder = 'Type a server command (e.g. help, list, stop)...';
+    consoleInput.placeholder = 'Type a command — try help or list';
     consoleInput.disabled = false;
   }
 }
 
-quickServerBtn.addEventListener('click', async () => {
+async function toggleServer() {
   const st = await window.api.getServerStatus();
   if (st.isRunning) {
-    quickServerBtn.disabled = true;
-    quickServerBtn.textContent = 'Stopping...';
+    setToggleButtonsState(true, 'Stopping…');
     await window.api.stopServer();
-    quickServerBtn.disabled = false;
     showToast('Server stopped', 'info');
   } else {
-    quickServerBtn.disabled = true;
-    quickServerBtn.textContent = 'Starting...';
-    const mode = consoleLaunchMode?.value || appConfig?.launchMode || 'integrated';
-    const maxRam = settingsMaxRam?.value || appConfig?.maxRam || '6G';
+    setToggleButtonsState(false, 'Starting…');
+    const mode = appConfig?.launchMode || 'integrated';
+    const maxRam = appConfig?.maxRam || '6G';
     const res = await window.api.startServer({ mode, maxRam });
-    quickServerBtn.disabled = false;
     if (res.error) {
-      showToast(`Failed to start: ${res.error}`, 'error');
+      showToast(`Could not start server: ${res.error}`, 'error');
     } else {
-      if (mode === 'detached') {
-        showToast('Server launched in independent terminal window!', 'success');
-      } else {
-        showToast('Server starting!', 'success');
-        switchTab('console');
-      }
+      showToast(mode === 'detached' ? 'Server launched in a separate window' : 'Server started', 'success');
+      if (mode === 'integrated') switchTab('console');
     }
   }
   await refreshServerStatus();
+}
+
+quickServerBtn.addEventListener('click', toggleServer);
+heroServerBtn.addEventListener('click', toggleServer);
+
+// Batched log rendering for zero UI jank
+const MAX_CONSOLE_LINES = 600;
+let pendingLogLines = [];
+let logFlushScheduled = false;
+let stickToBottom = true;
+
+function isNearBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 36;
+}
+
+function scrollToConsoleBottom() {
+  consoleOutput.scrollTop = consoleOutput.scrollHeight;
+  stickToBottom = true;
+  consoleJump.classList.add('hidden');
+}
+
+consoleOutput.addEventListener('scroll', () => {
+  stickToBottom = isNearBottom(consoleOutput);
+  consoleJump.classList.toggle('hidden', stickToBottom);
 });
 
-if (consoleLaunchMode) {
-  consoleLaunchMode.addEventListener('change', () => {
-    const mode = consoleLaunchMode.value;
-    if (settingsLaunchMode) settingsLaunchMode.value = mode;
-    if (appConfig) appConfig.launchMode = mode;
-    refreshServerStatus();
-    window.api.saveConfig(appConfig);
-  });
+consoleJump.addEventListener('click', scrollToConsoleBottom);
+
+function queueLogLine(entry) {
+  pendingLogLines.push(entry);
+  if (!logFlushScheduled) {
+    logFlushScheduled = true;
+    requestAnimationFrame(flushLogLines);
+  }
 }
 
-if (settingsLaunchMode) {
-  settingsLaunchMode.addEventListener('change', () => {
-    const mode = settingsLaunchMode.value;
-    if (consoleLaunchMode) consoleLaunchMode.value = mode;
-    if (appConfig) appConfig.launchMode = mode;
-    refreshServerStatus();
-  });
-}
+function flushLogLines() {
+  logFlushScheduled = false;
+  if (pendingLogLines.length === 0) return;
 
-// Stream Server Logs
-window.api.onServerLog((entry) => {
-  const line = document.createElement('div');
-  line.className = `console-line ${entry.type || ''}`;
-  line.textContent = entry.text;
-  consoleOutput.appendChild(line);
+  const frag = document.createDocumentFragment();
+  for (const entry of pendingLogLines) {
+    const line = document.createElement('div');
+    line.className = `log-line ${entry.type || ''}`;
+    line.textContent = entry.text;
+    frag.appendChild(line);
+  }
+  pendingLogLines = [];
+  consoleOutput.appendChild(frag);
 
-  if (consoleAutoScroll.checked) {
+  while (consoleOutput.childElementCount > MAX_CONSOLE_LINES) {
+    consoleOutput.firstElementChild.remove();
+  }
+
+  if (stickToBottom) {
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
   }
-});
+}
 
-window.api.onServerStatusChange((status) => {
-  updateServerStatusUI(status);
-});
+window.api.onServerLog((entry) => queueLogLine(entry));
+window.api.onServerStatusChange((status) => updateServerStatusUI(status));
 
 consoleInputForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -1315,66 +1581,67 @@ consoleInput.addEventListener('keydown', (e) => {
 
 btnClearConsole.addEventListener('click', () => {
   consoleOutput.innerHTML = '';
+  consoleJump.classList.add('hidden');
 });
 
-// ==========================================
-// SETTINGS
-// ==========================================
-btnBrowseServerDir.addEventListener('click', async () => {
+// ============================================================================
+// Auto-Saving Settings & Folder Actions
+// ============================================================================
+async function handleChooseServerFolder() {
   const chosen = await window.api.selectServerDir();
-  if (chosen) {
-    settingsServerDir.value = chosen;
-    dashServerDir.textContent = chosen;
-    showToast('Updated server directory', 'success');
-    await checkServerVersion();
-    await loadInstalledMods();
-    await refreshAccountStatus();
-  }
+  if (!chosen) return;
+  appConfig.serverDir = chosen;
+  applyConfigToUI();
+  showToast('Server folder updated', 'success');
+  await Promise.all([checkServerVersion(), loadInstalledMods(true), refreshAccountStatus()]);
+}
+
+btnBrowseServerDir.addEventListener('click', handleChooseServerFolder);
+btnChangeFolderDash.addEventListener('click', handleChooseServerFolder);
+
+function openServerFolder() {
+  if (appConfig?.serverDir) window.api.openPath(appConfig.serverDir);
+}
+
+heroFolderBtn.addEventListener('click', openServerFolder);
+dashServerDir.addEventListener('click', openServerFolder);
+
+function bindLaunchModeSegmented(container) {
+  container.querySelectorAll('button[data-value]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const mode = btn.dataset.value;
+      await saveConfigPatch({ launchMode: mode });
+      updateServerStatusUI(lastServerStatus);
+    });
+  });
+}
+
+bindLaunchModeSegmented(consoleLaunchMode);
+bindLaunchModeSegmented(settingsLaunchMode);
+
+settingsMaxRam.addEventListener('change', () => {
+  saveConfigPatch({ maxRam: settingsMaxRam.value });
 });
 
-btnSaveSettings.addEventListener('click', async () => {
-  const patchline = settingsPatchline.value;
-  const cfApiKey = settingsCfApiKey.value.trim();
-  const launchMode = settingsLaunchMode ? settingsLaunchMode.value : 'integrated';
-  const maxRam = settingsMaxRam ? settingsMaxRam.value : '6G';
-  const closeToTray = settingsCloseToTray ? settingsCloseToTray.checked : true;
-
-  appConfig.patchline = patchline;
-  appConfig.cfApiKey = cfApiKey;
-  appConfig.launchMode = launchMode;
-  appConfig.maxRam = maxRam;
-  appConfig.closeToTray = closeToTray;
-
-  if (consoleLaunchMode) consoleLaunchMode.value = launchMode;
-  if (detachedModeNotice) detachedModeNotice.classList.toggle('hidden', launchMode !== 'detached');
-
-  await window.api.saveConfig(appConfig);
-  showToast('Settings saved successfully!', 'success');
+settingsPatchline.addEventListener('change', async () => {
+  await saveConfigPatch({ patchline: settingsPatchline.value });
   await checkServerVersion();
 });
 
-openServerFolderBtn.addEventListener('click', () => {
-  if (appConfig?.serverDir) {
-    window.api.openPath(appConfig.serverDir);
-  }
+settingsCloseToTray.addEventListener('change', () => {
+  saveConfigPatch({ closeToTray: settingsCloseToTray.checked });
 });
 
-// Helpers
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+settingsLoginItem.addEventListener('change', async () => {
+  const enabled = await window.api.setLoginItem(settingsLoginItem.checked);
+  settingsLoginItem.checked = Boolean(enabled);
+});
 
-function formatNumber(num) {
-  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-  return String(num);
-}
+const saveApiKeyDebounced = debounce(() => {
+  saveConfigPatch({ cfApiKey: settingsCfApiKey.value.trim() });
+}, 400);
 
-// Start
+settingsCfApiKey.addEventListener('input', saveApiKeyDebounced);
+
+// Boot
 init();

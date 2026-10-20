@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('api', {
   selectServerDir: () => ipcRenderer.invoke('dialog:select-server-dir'),
   openPath: (p) => ipcRenderer.invoke('system:open-path', p),
   openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
+  getLoginItem: () => ipcRenderer.invoke('app:get-login-item'),
+  setLoginItem: (enabled) => ipcRenderer.invoke('app:set-login-item', enabled),
 
   // Hytale Account
   getHytaleStatus: () => ipcRenderer.invoke('hytale:get-status'),

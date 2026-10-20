@@ -179,16 +179,27 @@ class ServerRunner extends EventEmitter {
 
   _startDetachedMonitor() {
     if (this._detachedCheckInterval) return;
-    this._detachedCheckInterval = setInterval(async () => {
+    // Cheap liveness probe: signal 0 checks the PID without spawning a shell.
+    // (Spawning PowerShell every few seconds costs noticeable CPU in the background.)
+    this._detachedCheckInterval = setInterval(() => {
       if (!this.isRunning || !this.isDetached || this.process) {
         this._stopDetachedMonitor();
         return;
       }
-      const st = await this.findRunningServerProcess();
-      if (!st.isRunning) {
+      let alive = false;
+      try {
+        process.kill(this.detachedPid, 0);
+        alive = true;
+      } catch {}
+      if (!alive) {
         this._stopDetachedMonitor();
+        this.isRunning = false;
+        this.isDetached = false;
+        this.detachedPid = null;
+        this.emit('status-change', this.getStatus());
       }
-    }, 4000);
+    }, 5000);
+    if (this._detachedCheckInterval.unref) this._detachedCheckInterval.unref();
   }
 
   _stopDetachedMonitor() {

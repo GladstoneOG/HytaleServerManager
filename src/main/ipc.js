@@ -3,7 +3,7 @@
  * Electron IPC Handler Registration
  * Connects frontend UI actions with backend services.
  */
-const { ipcMain, dialog, shell } = require('electron');
+const { app, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fsp = require('fs/promises');
 const { readJson, writeJsonAtomic, ensureDir } = require('./util');
@@ -79,7 +79,32 @@ function registerIpcHandlers({
   });
 
   ipcMain.handle('system:open-external', async (_, url) => {
-    if (url) await shell.openExternal(url);
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) await shell.openExternal(url);
+  });
+
+  // --- Launch at login (starts hidden in the tray) ---
+  function loginItemOptions() {
+    // In development the app runs via electron.exe, so the app path must be passed explicitly
+    return app.isPackaged
+      ? { path: process.execPath, args: ['--hidden'] }
+      : { path: process.execPath, args: [app.getAppPath(), '--hidden'] };
+  }
+
+  ipcMain.handle('app:get-login-item', () => {
+    try {
+      return { openAtLogin: app.getLoginItemSettings(loginItemOptions()).openAtLogin };
+    } catch {
+      return { openAtLogin: false };
+    }
+  });
+
+  ipcMain.handle('app:set-login-item', (_, enabled) => {
+    try {
+      app.setLoginItemSettings({ openAtLogin: !!enabled, ...loginItemOptions() });
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
   });
 
   // --- Hytale Auth ---
