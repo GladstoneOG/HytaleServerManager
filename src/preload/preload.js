@@ -74,4 +74,16 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('server:status-change', fn);
     return () => ipcRenderer.removeListener('server:status-change', fn);
   },
+
+  // Fresh Server Installation Wizard
+  detectClientInstall: () => ipcRenderer.invoke('installer:detect-client'),
+  checkJava: () => ipcRenderer.invoke('installer:check-java'),
+  selectZipFileDialog: () => ipcRenderer.invoke('dialog:select-zip-file'),
+  initializeServer: (targetDir, options) => ipcRenderer.invoke('installer:initialize-server', targetDir, options),
+  cancelServerInstall: () => ipcRenderer.invoke('installer:cancel'),
+  onInstallerProgress: (cb) => {
+    const fn = (_, data) => cb(data);
+    ipcRenderer.on('installer:progress', fn);
+    return () => ipcRenderer.removeListener('installer:progress', fn);
+  },
 });

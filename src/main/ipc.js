@@ -13,6 +13,7 @@ function registerIpcHandlers({
   appConfigPath,
   authManager,
   serverUpdater,
+  serverInstaller,
   modManager,
   serverRunner,
   cfClient,
@@ -289,6 +290,64 @@ function registerIpcHandlers({
 
   ipcMain.handle('server:get-logs', () => {
     return serverRunner.getLogs();
+  });
+
+  // --- Fresh Server Installation Wizard ---
+  ipcMain.handle('installer:detect-client', async () => {
+    return await serverInstaller.detectLocalClientInstall();
+  });
+
+  ipcMain.handle('installer:check-java', async () => {
+    return await serverInstaller.checkJava();
+  });
+
+  ipcMain.handle('dialog:select-zip-file', async () => {
+    const res = await dialog.showOpenDialog(win, {
+      title: 'Select Hytale Server Archive (.zip)',
+      properties: ['openFile'],
+      filters: [{ name: 'Zip Archive', extensions: ['zip'] }],
+    });
+    if (!res.canceled && res.filePaths.length > 0) {
+      return res.filePaths[0];
+    }
+    return null;
+  });
+
+  let activeInstallerAbort = null;
+  ipcMain.handle('installer:initialize-server', async (_, targetDir, options = {}) => {
+    if (activeInstallerAbort) activeInstallerAbort.abort();
+    activeInstallerAbort = new AbortController();
+
+    try {
+      const result = await serverInstaller.initializeServer(targetDir, {
+        ...options,
+        signal: activeInstallerAbort.signal,
+        onProgress: (p) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send('installer:progress', p);
+          }
+        },
+      });
+
+      // Update active serverDir in app config automatically!
+      const cfg = await getAppConfig();
+      cfg.serverDir = targetDir;
+      await saveAppConfig(cfg);
+
+      return { success: true, ...result };
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      activeInstallerAbort = null;
+    }
+  });
+
+  ipcMain.handle('installer:cancel', () => {
+    if (activeInstallerAbort) {
+      activeInstallerAbort.abort();
+      activeInstallerAbort = null;
+    }
+    return { success: true };
   });
 
   // Forward server runner events to UI

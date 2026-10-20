@@ -18,11 +18,12 @@ Browse, install, and update mods from **CurseForge** and **Thunderstore** in 1 c
 ## 📖 Table of Contents
 - [Why Hytale Server Mod Manager?](#-why-hytale-server-mod-manager)
 - [Key Features](#-key-features)
-  - [1. CurseForge & Thunderstore 1-Click Install](#1-curseforge--thunderstore-1-click-install)
-  - [2. Seamless Server Auto-Updater](#2-seamless-server-auto-updater)
-  - [3. Mod Profiles & Team Sync](#3-mod-profiles--team-sync)
-  - [4. Mod Enable/Disable & Status Management](#4-mod-enabledisable--status-management)
-  - [5. Live Server Console & Execution](#5-live-server-console--execution)
+  - [1. Fresh Server Provisioning & Installation Wizard](#1-fresh-server-provisioning--installation-wizard)
+  - [2. CurseForge & Thunderstore 1-Click Install](#2-curseforge--thunderstore-1-click-install)
+  - [3. Seamless Server Auto-Updater](#3-seamless-server-auto-updater)
+  - [4. Mod Profiles & Team Sync](#4-mod-profiles--team-sync)
+  - [5. Mod Enable/Disable & Status Management](#5-mod-enabledisable--status-management)
+  - [6. Live Server Console & Execution](#6-live-server-console--execution)
 - [Prerequisites](#-prerequisites)
 - [Installation Guide](#-installation-guide)
   - [Quick Start (Recommended)](#quick-start-recommended)
@@ -54,29 +55,39 @@ In Hytale, client-side modding is straightforward thanks to in-game mod browsers
 
 ## 🚀 Key Features
 
-### 1. CurseForge & Thunderstore 1-Click Install
+### 1. Fresh Server Provisioning & Installation Wizard (Hytale Server Manual Compliant)
+If you have **zero server files** on your PC, the built-in wizard sets up a complete, production-ready Hytale server following the official [Hytale Server Manual](https://support.hytale.com/hc/en-us/articles/45326769420827-Hytale-Server-Manual):
+* **⚡ Instant Local Client Clone (Fastest):** Automatically detects existing Hytale game client installations on your machine (`%APPDATA%\Hytale\install\release\package\game\latest`) and clones `HytaleServer.jar`, `HytaleServer.aot.config`, `Licenses/`, and `Assets.zip` in seconds without re-downloading ~4 GB over the internet.
+* **🌐 Official Cloud Download:** Authenticates via official Hytale OAuth2 and downloads the complete server package (`0.7.2.zip`) directly to your machine with resumable HTTP range downloads.
+* **📦 Existing Zip Extraction:** Unpacks any previously downloaded server archive.
+* **Complete Directory Layout:** Automatically constructs `.cache/`, `logs/`, `mods/`, and `universe/` folders.
+* **Automated `config.json` Generation:** Configures server display name, MOTD, player limits, and default QUIC UDP port (`5520`).
+* **Ready-to-Use Scripts:** Generates tailored `start.bat` and `start.sh` with recommended Java 25 flags.
+* **Java Environment Verification:** Probes your system for **Java 25** (Adoptium Temurin recommended) to ensure server compatibility before launch.
+
+### 2. CurseForge & Thunderstore 1-Click Install
 * **Integrated CurseForge Search:** Uses Hytale Game ID `70216` and Mods Class `9137` to browse thousands of community mods with categories, download counts, and release notes.
 * **Thunderstore Support:** Native integration with Thunderstore's `hytale` community. Packages with zipped `.jar` contents are automatically unpacked into `Server/mods/`.
 * **Automatic Dependency Resolution:** Detects required dependencies (e.g. `LevelingCore`, `TagCore`, `ClassesCore`) and prompts or installs them automatically.
 * **Murmur2 Reverse Fingerprinting:** Existing mod jars placed in your server directory are fingerprinted using whitespace-normalized 32-bit Murmur2 hashes and matched against CurseForge to automatically detect mod identities and updates.
 
-### 2. Seamless Server Auto-Updater
+### 3. Seamless Server Auto-Updater
 * **Manifest Comparison:** Reads `Implementation-Version` from your server's `HytaleServer.jar` (e.g. `0.7.1`) and checks the official Hytale account service for new releases (e.g. `0.7.2`).
 * **Resumable HTTP Range Downloads:** Downloads large server updates using chunked HTTP Range requests with automatic exponential backoff and retries, eliminating corrupted downloads caused by dropped connections.
 * **Integrity Validation:** Validates server packages with SHA-256 before applying.
 * **Automated Safety Backups:** Before overwriting binaries, copies `HytaleServer.jar`, `HytaleServer.aot.config`, and `Assets.zip` into an `updater_backups/` snapshot folder.
 * **Zero Config Overwrite:** Never touches your `config.json`, world saves (`universe/`), player permissions, bans, or `mods/`.
 
-### 3. Mod Profiles & Team Sync
+### 4. Mod Profiles & Team Sync
 * **Snapshot Profiles:** Save your current mod list as a named profile (e.g., *Vanilla+*, *RPG Overhaul*, *Hardcore Challenge*).
 * **1-Click Switching:** Activate a profile to enable the mods assigned to it and disable the rest.
 * **Export & Share:** Export profiles to `.json` files. When co-admins or friends import the file, any missing mods from CurseForge or Thunderstore are automatically downloaded and installed.
 
-### 4. Mod Enable/Disable & Status Management
+### 5. Mod Enable/Disable & Status Management
 * Toggle individual mods on or off with a switch. The app coordinates both file renaming (`.jar` ↔ `.jar.disabled`) and the server `config.json`'s `Mods` section for thorough compatibility.
 * Batch "Update All" button detects newer releases across all your installed mods.
 
-### 5. Live Server Console & Execution
+### 6. Live Server Console & Execution
 * **Start & Stop:** Start the server directly from the top bar with configurable memory allocations (`-Xms4G -Xmx6G`).
 * **Real-Time Stream:** Monospace terminal with color-coded log levels (`INFO`, `WARN`, `ERROR`, `SYSTEM`).
 * **Command Input:** Send server commands (`help`, `list`, `stop`, `op`, `say`) with command history (Up/Down arrow navigation).
@@ -169,6 +180,7 @@ HytaleServerManager/
 │   ├── main/
 │   │   ├── main.js             # Electron application lifecycle
 │   │   ├── ipc.js              # Secure IPC communication bridge
+│   │   ├── serverInstaller.js  # Fresh server provisioning & directory wizard
 │   │   ├── curseforge.js       # CurseForge API (search, download, dependency resolution)
 │   │   ├── thunderstore.js     # Thunderstore API & package extractor
 │   │   ├── hytaleAuth.js       # OAuth 2.0 Device Code client & credential manager
@@ -215,6 +227,8 @@ The test suite validates:
 - [x] CurseForge Hytale search & metadata API
 - [x] Thunderstore Hytale community package API
 - [x] Profile snapshot creation and activation
+- [x] System Java 25 / runtime environment verification
+- [x] Local Hytale game client installation detection
 
 ---
 

@@ -10,7 +10,10 @@ const { CurseForgeClient } = require('../src/main/curseforge');
 const { ThunderstoreClient } = require('../src/main/thunderstore');
 const { HytaleAuthManager } = require('../src/main/hytaleAuth');
 const { ServerUpdater } = require('../src/main/serverUpdater');
+const { ServerInstaller } = require('../src/main/serverInstaller');
 const { ModManager } = require('../src/main/modManager');
+const fsp = require('fs/promises');
+const os = require('os');
 
 async function run() {
   console.log('🧪 Starting Hytale Server Manager Verification Tests...\n');
@@ -100,9 +103,29 @@ async function run() {
   console.log(`  Created profile "TestSnapshot" with ${newProfile.mods.length} mods`);
   const afterProfiles = await modMgr.getProfiles();
   assert(afterProfiles.some((p) => p.name === 'TestSnapshot'));
+  // Clean up test profile
+  await fsp.rm('F:\\serverht\\Server\\.mod_profiles\\TestSnapshot.json', { force: true }).catch(() => {});
   console.log('  ✓ Profiles created and verified');
 
-  console.log('\n🎉 ALL 8 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 9: Java Environment Check
+  console.log('Test 9: Java Environment Probe');
+  const installer = new ServerInstaller({ authManager: auth, serverUpdater: updater });
+  const javaCheck = await installer.checkJava();
+  console.log('  Java probe result:', javaCheck);
+  assert.strictEqual(javaCheck.installed, true);
+  assert(javaCheck.majorVersion >= 21);
+  console.log(`  ✓ Detected system Java: ${javaCheck.version} (Major: ${javaCheck.majorVersion})`);
+
+  // Test 10: Local Client Install Detection
+  console.log('Test 10: Local Game Client Detection');
+  const clientCheck = await installer.detectLocalClientInstall();
+  console.log('  Local client detection:', clientCheck);
+  assert.strictEqual(clientCheck.detected, true);
+  assert(clientCheck.jarPath !== null);
+  assert(clientCheck.assetsPath !== null);
+  console.log('  ✓ Successfully detected local client installation files');
+
+  console.log('\n🎉 ALL 10 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

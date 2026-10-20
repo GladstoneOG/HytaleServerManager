@@ -71,6 +71,9 @@
           <h1 id="page-title">Dashboard</h1>
         </div>
         <div class="top-bar-right">
+          <button id="btn-topbar-install-wizard" class="btn btn-accent btn-sm" title="Initialize a new Hytale Server">
+            ✨ Setup New Server
+          </button>
           <div class="quick-server-control">
             <button id="quick-server-btn" class="btn btn-primary btn-sm">▶ Start Server</button>
           </div>
@@ -88,6 +91,18 @@
 
         <!-- ================= DASHBOARD TAB ================= -->
         <section id="tab-dashboard" class="tab-pane active">
+          <!-- Setup / Not Installed Banner (Conditional) -->
+          <div id="server-not-installed-banner" class="banner banner-install hidden">
+            <div class="banner-icon">✨</div>
+            <div class="banner-content">
+              <h3>No Hytale Server Detected In This Folder</h3>
+              <p>Your server directory does not have <code>HytaleServer.jar</code> installed yet. Set up a fresh server in seconds with our installation wizard.</p>
+            </div>
+            <div class="banner-actions">
+              <button id="btn-open-install-wizard-dash" class="btn btn-primary">Initialize Server Now</button>
+            </div>
+          </div>
+
           <!-- Update Banner (Conditional) -->
           <div id="server-update-banner" class="banner banner-update hidden">
             <div class="banner-icon">🚀</div>
@@ -392,6 +407,130 @@
 
       </div>
     </main>
+  </div>
+
+  <!-- Server Installation Wizard Modal -->
+  <div id="install-modal" class="modal-overlay hidden">
+    <div class="modal-window modal-wide">
+      <div class="modal-header">
+        <h3>✨ Hytale Server Installation & Provisioning Wizard</h3>
+        <button id="modal-install-close-btn" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-lead">
+          Set up a fresh Hytale Dedicated Server following the official <strong>Hytale Server Manual</strong> specifications.
+        </p>
+
+        <!-- Java Environment Notice -->
+        <div id="wizard-java-status" class="status-box status-info">
+          <span class="icon">☕</span>
+          <div class="status-text">
+            <strong>Java Environment:</strong> <span id="wizard-java-text">Checking Java...</span>
+          </div>
+        </div>
+
+        <div class="wizard-steps-container">
+          <!-- Step 1: Destination -->
+          <div class="form-group mt-16">
+            <label>1. Target Server Installation Directory</label>
+            <div class="input-with-button">
+              <input type="text" id="wizard-target-dir" class="input-text" value="F:\serverht\Server">
+              <button id="wizard-btn-browse-dir" class="btn btn-secondary">Browse...</button>
+            </div>
+            <small class="form-help">Where your <code>HytaleServer.jar</code>, <code>mods/</code>, and world data will be set up.</small>
+          </div>
+
+          <!-- Step 2: Source -->
+          <div class="form-group mt-16">
+            <label>2. Choose Server Files Source</label>
+            <div class="radio-card-group">
+              <label class="radio-card" id="source-card-local">
+                <input type="radio" name="wizard-source" value="local_client" checked>
+                <div class="radio-card-content">
+                  <div class="radio-title">
+                    ⚡ Copy from Local Hytale Client
+                    <span id="wizard-local-detected-badge" class="badge badge-success">Detected on PC</span>
+                  </div>
+                  <div class="radio-desc">
+                    Fastest (zero download required). Directly clones server binaries and <code>Assets.zip</code> from your local Hytale launcher installation.
+                  </div>
+                </div>
+              </label>
+
+              <label class="radio-card" id="source-card-download">
+                <input type="radio" name="wizard-source" value="download">
+                <div class="radio-card-content">
+                  <div class="radio-title">
+                    🌐 Download from Hytale Account (OAuth2)
+                  </div>
+                  <div class="radio-desc">
+                    Downloads the latest official server build package (e.g. <code>0.7.2.zip</code>) directly from Hytale's high-speed CDN.
+                  </div>
+                </div>
+              </label>
+
+              <label class="radio-card" id="source-card-zip">
+                <input type="radio" name="wizard-source" value="zip_file">
+                <div class="radio-card-content">
+                  <div class="radio-title">
+                    📦 Select Existing Server ZIP File
+                  </div>
+                  <div class="radio-desc">
+                    Unpack a previously downloaded server archive (e.g. <code>0.7.1.zip</code>).
+                  </div>
+                  <div id="wizard-zip-file-picker" class="input-with-button mt-8 hidden">
+                    <input type="text" id="wizard-zip-file-input" class="input-text" placeholder="Click browse to select a .zip file..." readonly>
+                    <button id="wizard-btn-browse-zip" class="btn btn-secondary btn-sm" type="button">Browse Zip...</button>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Step 3: Server Preferences -->
+          <div class="form-group mt-16">
+            <label>3. Server Configuration & Networking</label>
+            <div class="grid-2-col">
+              <div>
+                <label class="form-sublabel">Server Display Name</label>
+                <input type="text" id="wizard-server-name" class="input-text" value="My Hytale Server">
+              </div>
+              <div>
+                <label class="form-sublabel">Default Game Mode</label>
+                <select id="wizard-game-mode" class="input-select">
+                  <option value="Adventure">Adventure</option>
+                  <option value="Creative">Creative</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-sublabel">QUIC UDP Port (Default 5520)</label>
+                <input type="number" id="wizard-port" class="input-text" value="5520">
+              </div>
+              <div>
+                <label class="form-sublabel">Max Players</label>
+                <input type="number" id="wizard-max-players" class="input-text" value="20">
+              </div>
+            </div>
+            <div class="mt-8">
+              <label class="form-sublabel">Server Message of the Day (MOTD)</label>
+              <input type="text" id="wizard-motd" class="input-text" value="Welcome to our Hytale Dedicated Server!">
+            </div>
+          </div>
+
+          <!-- Installation Progress (Conditional) -->
+          <div id="wizard-progress-wrap" class="progress-wrap hidden mt-16">
+            <div class="progress-bar">
+              <div id="wizard-progress-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div id="wizard-progress-text" class="progress-status-text">Initializing...</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="wizard-btn-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="wizard-btn-start" class="btn btn-primary">🚀 Begin Server Installation</button>
+      </div>
+    </div>
   </div>
 
   <!-- Mod Details Modal -->

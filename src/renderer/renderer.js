@@ -15,6 +15,9 @@ const quickServerBtn = document.getElementById('quick-server-btn');
 const openServerFolderBtn = document.getElementById('open-server-folder-btn');
 
 // Dashboard Elements
+const serverNotInstalledBanner = document.getElementById('server-not-installed-banner');
+const btnOpenInstallWizardDash = document.getElementById('btn-open-install-wizard-dash');
+const btnTopbarInstallWizard = document.getElementById('btn-topbar-install-wizard');
 const serverUpdateBanner = document.getElementById('server-update-banner');
 const targetVersionTag = document.getElementById('target-version-tag');
 const btnUpdateServerNow = document.getElementById('btn-update-server-now');
@@ -94,6 +97,28 @@ const modalModTitle = document.getElementById('modal-mod-title');
 const modalModContent = document.getElementById('modal-mod-content');
 const modalModFooter = document.getElementById('modal-mod-footer');
 const modalCloseBtn = document.getElementById('modal-close-btn');
+
+// Installation Wizard Elements
+const installModal = document.getElementById('install-modal');
+const modalInstallCloseBtn = document.getElementById('modal-install-close-btn');
+const wizardTargetDir = document.getElementById('wizard-target-dir');
+const wizardBtnBrowseDir = document.getElementById('wizard-btn-browse-dir');
+const wizardLocalDetectedBadge = document.getElementById('wizard-local-detected-badge');
+const wizardJavaStatus = document.getElementById('wizard-java-status');
+const wizardJavaText = document.getElementById('wizard-java-text');
+const wizardZipFilePicker = document.getElementById('wizard-zip-file-picker');
+const wizardZipFileInput = document.getElementById('wizard-zip-file-input');
+const wizardBtnBrowseZip = document.getElementById('wizard-btn-browse-zip');
+const wizardServerName = document.getElementById('wizard-server-name');
+const wizardGameMode = document.getElementById('wizard-game-mode');
+const wizardPort = document.getElementById('wizard-port');
+const wizardMaxPlayers = document.getElementById('wizard-max-players');
+const wizardMotd = document.getElementById('wizard-motd');
+const wizardProgressWrap = document.getElementById('wizard-progress-wrap');
+const wizardProgressFill = document.getElementById('wizard-progress-fill');
+const wizardProgressText = document.getElementById('wizard-progress-text');
+const wizardBtnCancel = document.getElementById('wizard-btn-cancel');
+const wizardBtnStart = document.getElementById('wizard-btn-start');
 
 // State
 let appConfig = null;
@@ -267,6 +292,13 @@ async function checkServerVersion() {
     dashInstalledVer.textContent = res.installedVersion || (res.installed ? 'Unknown' : 'Not Installed');
     dashVersionBadge.textContent = res.installedVersion ? `v${res.installedVersion}` : 'No Jar';
 
+    if (!res.installed) {
+      serverNotInstalledBanner.classList.remove('hidden');
+      serverUpdateBanner.classList.add('hidden');
+    } else {
+      serverNotInstalledBanner.classList.add('hidden');
+    }
+
     if (res.latestVersion) {
       dashUpstreamVer.textContent = `v${res.latestVersion}`;
     } else if (res.authRequired) {
@@ -275,7 +307,7 @@ async function checkServerVersion() {
       dashUpstreamVer.textContent = 'Unknown';
     }
 
-    if (res.updateAvailable && res.latestVersion) {
+    if (res.installed && res.updateAvailable && res.latestVersion) {
       serverUpdateBanner.classList.remove('hidden');
       targetVersionTag.textContent = res.latestVersion;
     } else {
@@ -327,6 +359,165 @@ btnUpdateServerNow.addEventListener('click', async () => {
     btnUpdateServerNow.disabled = false;
     updateProgressContainer.classList.add('hidden');
     unlisten();
+  }
+});
+
+// ==========================================
+// SERVER INSTALLATION WIZARD
+// ==========================================
+async function openInstallWizard() {
+  installModal.classList.remove('hidden');
+  wizardProgressWrap.classList.add('hidden');
+  wizardProgressFill.style.width = '0%';
+  wizardBtnStart.disabled = false;
+
+  // Set default target directory from current app config or input
+  if (appConfig?.serverDir) {
+    wizardTargetDir.value = appConfig.serverDir;
+  }
+
+  // Check Java runtime status
+  try {
+    const javaInfo = await window.api.checkJava();
+    if (javaInfo.installed) {
+      wizardJavaText.innerHTML = `<span class="text-success">${escapeHtml(javaInfo.version)} (Detected)</span> — ${
+        javaInfo.isJava25Recommended ? 'Meets recommended Java 25 requirement.' : 'Java found. Java 25 recommended for production.'
+      }`;
+    } else {
+      wizardJavaText.innerHTML = `<span class="text-danger">Java not found in PATH</span> — Please install Java 25 (Adoptium Temurin) to run the server.`;
+    }
+  } catch {
+    wizardJavaText.textContent = 'Could not probe Java version.';
+  }
+
+  // Detect local client installation
+  try {
+    const local = await window.api.detectClientInstall();
+    if (local.detected) {
+      wizardLocalDetectedBadge.classList.remove('hidden');
+      wizardLocalDetectedBadge.textContent = 'Detected on PC ✓';
+      // Default select local_client
+      const localRadio = document.querySelector('input[name="wizard-source"][value="local_client"]');
+      if (localRadio) localRadio.checked = true;
+      wizardZipFilePicker.classList.add('hidden');
+    } else {
+      wizardLocalDetectedBadge.classList.add('hidden');
+      const dlRadio = document.querySelector('input[name="wizard-source"][value="download"]');
+      if (dlRadio) dlRadio.checked = true;
+      wizardZipFilePicker.classList.add('hidden');
+    }
+  } catch {
+    wizardLocalDetectedBadge.classList.add('hidden');
+  }
+}
+
+// Source radio buttons change listener
+document.querySelectorAll('input[name="wizard-source"]').forEach((radio) => {
+  radio.addEventListener('change', (e) => {
+    if (e.target.value === 'zip_file') {
+      wizardZipFilePicker.classList.remove('hidden');
+    } else {
+      wizardZipFilePicker.classList.add('hidden');
+    }
+  });
+});
+
+wizardBtnBrowseDir.addEventListener('click', async () => {
+  const chosen = await window.api.selectServerDir();
+  if (chosen) {
+    wizardTargetDir.value = chosen;
+  }
+});
+
+wizardBtnBrowseZip.addEventListener('click', async () => {
+  const zip = await window.api.selectZipFileDialog();
+  if (zip) {
+    wizardZipFileInput.value = zip;
+  }
+});
+
+modalInstallCloseBtn.addEventListener('click', () => {
+  installModal.classList.add('hidden');
+});
+
+wizardBtnCancel.addEventListener('click', () => {
+  window.api.cancelServerInstall();
+  installModal.classList.add('hidden');
+});
+
+btnTopbarInstallWizard.addEventListener('click', openInstallWizard);
+if (btnOpenInstallWizardDash) {
+  btnOpenInstallWizardDash.addEventListener('click', openInstallWizard);
+}
+
+wizardBtnStart.addEventListener('click', async () => {
+  const targetDir = wizardTargetDir.value.trim();
+  if (!targetDir) {
+    showToast('Please select a target server folder', 'error');
+    return;
+  }
+
+  const selectedSource = document.querySelector('input[name="wizard-source"]:checked')?.value || 'local_client';
+  const zipPath = wizardZipFileInput.value.trim();
+
+  if (selectedSource === 'zip_file' && !zipPath) {
+    showToast('Please browse and select an existing server .zip file', 'error');
+    return;
+  }
+
+  const serverName = wizardServerName.value.trim() || 'My Hytale Server';
+  const motd = wizardMotd.value.trim() || 'Welcome to our Hytale Server!';
+  const port = parseInt(wizardPort.value, 10) || 5520;
+  const maxPlayers = parseInt(wizardMaxPlayers.value, 10) || 20;
+  const gameMode = wizardGameMode.value;
+
+  wizardBtnStart.disabled = true;
+  wizardProgressWrap.classList.remove('hidden');
+  wizardProgressFill.style.width = '0%';
+  wizardProgressText.textContent = 'Starting server installation...';
+
+  const unlistenProgress = window.api.onInstallerProgress((p) => {
+    if (p.total && p.done) {
+      const pct = Math.min(100, Math.round((p.done / p.total) * 100));
+      wizardProgressFill.style.width = `${pct}%`;
+    }
+    if (p.message) {
+      wizardProgressText.textContent = p.message;
+    }
+  });
+
+  try {
+    const res = await window.api.initializeServer(targetDir, {
+      source: selectedSource,
+      zipPath,
+      serverName,
+      motd,
+      port,
+      maxPlayers,
+      gameMode,
+    });
+
+    if (res.success) {
+      showToast(`Hytale Server successfully installed in ${targetDir}!`, 'success');
+      installModal.classList.add('hidden');
+
+      // Refresh app view with newly initialized server
+      appConfig.serverDir = targetDir;
+      dashServerDir.textContent = targetDir;
+      settingsServerDir.value = targetDir;
+
+      await checkServerVersion();
+      await loadInstalledMods();
+      await refreshAccountStatus();
+    } else {
+      showToast(`Installation failed: ${res.error}`, 'error');
+      wizardBtnStart.disabled = false;
+    }
+  } catch (err) {
+    showToast(`Installation error: ${err.message}`, 'error');
+    wizardBtnStart.disabled = false;
+  } finally {
+    unlistenProgress();
   }
 });
 

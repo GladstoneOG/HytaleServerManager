@@ -6,6 +6,7 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { HytaleAuthManager } = require('./hytaleAuth');
 const { ServerUpdater } = require('./serverUpdater');
+const { ServerInstaller } = require('./serverInstaller');
 const { ModManager } = require('./modManager');
 const { ServerRunner } = require('./serverRunner');
 const { CurseForgeClient } = require('./curseforge');
@@ -26,6 +27,7 @@ async function createWindow() {
   // Instantiate core clients and managers
   const authManager = new HytaleAuthManager({ serverDir: defaultServerDir });
   const serverUpdater = new ServerUpdater(authManager, { serverDir: defaultServerDir });
+  const serverInstaller = new ServerInstaller({ authManager, serverUpdater });
   const cfClient = new CurseForgeClient();
   const tsClient = new ThunderstoreClient();
   const modManager = new ModManager({
@@ -55,6 +57,7 @@ async function createWindow() {
     appConfigPath,
     authManager,
     serverUpdater,
+    serverInstaller,
     modManager,
     serverRunner,
     cfClient,
