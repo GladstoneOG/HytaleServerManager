@@ -9,20 +9,31 @@ const { ServerUpdater } = require('./serverUpdater');
 const { ServerInstaller } = require('./serverInstaller');
 const { ModManager } = require('./modManager');
 const { ServerRunner } = require('./serverRunner');
+const { TrayManager } = require('./tray');
 const { CurseForgeClient } = require('./curseforge');
 const { ThunderstoreClient } = require('./thunderstore');
 const { registerIpcHandlers } = require('./ipc');
-const { ensureDir } = require('./util');
+const { ensureDir, readJson } = require('./util');
 
 let mainWindow = null;
+let trayManager = null;
+let isAppQuitting = false;
 
 async function createWindow() {
   const userDataDir = app.getPath('userData');
   await ensureDir(userDataDir);
   const appConfigPath = path.join(userDataDir, 'config.json');
 
-  // Default server directory
-  const defaultServerDir = 'F:\\serverht\\Server';
+  // Load persistent application config or use sensible defaults
+  const appConfig = await readJson(appConfigPath, {
+    serverDir: 'F:\\serverht\\Server',
+    patchline: 'release',
+    closeToTray: true,
+    launchMode: 'integrated',
+    maxRam: '6G',
+    minRam: '4G',
+  });
+  const defaultServerDir = appConfig.serverDir || 'F:\\serverht\\Server';
 
   // Instantiate core clients and managers
   const authManager = new HytaleAuthManager({ serverDir: defaultServerDir });
@@ -52,6 +63,11 @@ async function createWindow() {
     },
   });
 
+  // Setup System Tray
+  trayManager = new TrayManager({ win: mainWindow, serverRunner });
+  trayManager.closeToTrayEnabled = appConfig.closeToTray !== false;
+  trayManager.init();
+
   registerIpcHandlers({
     win: mainWindow,
     appConfigPath,
@@ -60,12 +76,26 @@ async function createWindow() {
     serverInstaller,
     modManager,
     serverRunner,
+    trayManager,
     cfClient,
     tsClient,
   });
 
+  // Check if an external or previously detached HytaleServer.jar is already running
+  serverRunner.findRunningServerProcess().catch(() => {});
+
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+  // Close-to-Tray behavior
+  mainWindow.on('close', (event) => {
+    if (!isAppQuitting && !trayManager?.isQuitting) {
+      if (trayManager?.closeToTrayEnabled !== false) {
+        event.preventDefault();
+        trayManager.hideToTray();
+      }
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -74,8 +104,13 @@ async function createWindow() {
 
 app.whenReady().then(createWindow);
 
+app.on('before-quit', () => {
+  isAppQuitting = true;
+  if (trayManager) trayManager.isQuitting = true;
+});
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (isAppQuitting || process.platform !== 'darwin') {
     app.quit();
   }
 });

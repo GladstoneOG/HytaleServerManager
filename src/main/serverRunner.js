@@ -1,13 +1,15 @@
 'use strict';
 /**
  * Server Process Runner & Console Manager for Hytale Server
- * Handles:
- * - Launching HytaleServer with configurable JVM options and assets
- * - Capturing real-time console stdout/stderr and piping to UI
- * - Executing console commands via process stdin
- * - Graceful shutdown and process status monitoring
+ * Supports:
+ * - Integrated Mode: Captures real-time stdout/stderr, piping to UI
+ * - Detached / Independent Mode: Launches server in its own native console window
+ *   allowing the user to close the Manager application without stopping the game server!
+ * - Process Detach-on-Exit: Unrefs child process so Electron can quit while keeping server alive
+ * - OS Process Detection: Detects existing HytaleServer.jar instances running on the machine
+ * - Graceful shutdown and execution of stdin commands
  */
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { exists } = require('./util');
@@ -18,6 +20,8 @@ class ServerRunner extends EventEmitter {
     this.serverDir = serverDir;
     this.process = null;
     this.isRunning = false;
+    this.isDetached = false;
+    this.detachedPid = null;
     this.logs = [];
     this.maxLogLines = 2000;
   }
@@ -29,18 +33,59 @@ class ServerRunner extends EventEmitter {
   getStatus() {
     return {
       isRunning: this.isRunning,
-      pid: this.process ? this.process.pid : null,
+      isDetached: this.isDetached,
+      pid: this.process ? this.process.pid : this.detachedPid,
       serverDir: this.serverDir,
     };
   }
 
   /**
+   * Check if an external or previously detached HytaleServer.jar process is running
+   */
+  async findRunningServerProcess() {
+    // If managed process is active
+    if (this.isRunning && this.process) {
+      return { isRunning: true, pid: this.process.pid, managed: true };
+    }
+
+    return new Promise((resolve) => {
+      // Query Windows process table for HytaleServer.jar
+      const cmd = process.platform === 'win32'
+        ? 'powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"CommandLine LIKE \'%HytaleServer.jar%\'\\" | Select-Object -ExpandProperty ProcessId"'
+        : "pgrep -f 'HytaleServer.jar'";
+
+      exec(cmd, (err, stdout) => {
+        if (err || !stdout || !stdout.trim()) {
+          this.detachedPid = null;
+          return resolve({ isRunning: false, pid: null, managed: false });
+        }
+
+        const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+        const pid = parseInt(lines[0], 10);
+        if (pid && !isNaN(pid)) {
+          this.isRunning = true;
+          this.isDetached = true;
+          this.detachedPid = pid;
+          this.emit('status-change', this.getStatus());
+          return resolve({ isRunning: true, pid, managed: false });
+        }
+
+        resolve({ isRunning: false, pid: null, managed: false });
+      });
+    });
+  }
+
+  /**
    * Start the Hytale server process
+   * @param {Object} options
+   * @param {string} [options.mode='integrated'] 'integrated' (pipes to UI) or 'detached' (independent window)
+   * @param {Array<string>} [options.jvmOptions]
+   * @param {Array<string>} [options.extraArgs]
    */
   async startServer({
+    mode = 'integrated',
     jvmOptions = ['-Xms4G', '-Xmx6G', '-XX:+UseG1GC'],
     extraArgs = [],
-    useBatchFile = false,
   } = {}) {
     if (this.isRunning) {
       throw new Error('Server is already running');
@@ -51,7 +96,7 @@ class ServerRunner extends EventEmitter {
       throw new Error(`HytaleServer.jar not found at ${jarPath}`);
     }
 
-    // Determine assets path (in server dir or parent dir)
+    // Determine assets path
     let assetsPath = 'Assets.zip';
     if (await exists(path.join(this.serverDir, 'Assets.zip'))) {
       assetsPath = 'Assets.zip';
@@ -59,7 +104,7 @@ class ServerRunner extends EventEmitter {
       assetsPath = path.join('..', 'Assets.zip');
     }
 
-    const args = [
+    const javaArgs = [
       ...jvmOptions,
       '-jar',
       'HytaleServer.jar',
@@ -68,15 +113,45 @@ class ServerRunner extends EventEmitter {
       ...extraArgs,
     ];
 
-    this._appendLog(`[Manager] Starting Hytale Server with java ${args.join(' ')}\n`);
+    if (mode === 'detached') {
+      // Launch in an independent Windows Terminal / Command Prompt window
+      // The child process is completely unreferenced from Electron.
+      // Closing Electron has ZERO effect on the server!
+      this._appendLog(`[Manager] Launching Hytale Server in Independent Window (Detached Mode)...\n`);
+      this._appendLog(`[Manager] You can close this manager anytime without stopping your server.\n`);
 
-    this.process = spawn('java', args, {
+      const child = spawn('cmd.exe', ['/c', 'start', 'Hytale Server Main', 'java', ...javaArgs], {
+        cwd: this.serverDir,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+      });
+
+      child.unref();
+      this.isRunning = true;
+      this.isDetached = true;
+      this.detachedPid = child.pid;
+      this.emit('status-change', this.getStatus());
+
+      // Query actual java PID after launch
+      setTimeout(() => this.findRunningServerProcess(), 2000);
+
+      return this.getStatus();
+    }
+
+    // Integrated Mode: pipes stdout/stderr to manager UI
+    this._appendLog(`[Manager] Starting Hytale Server in Integrated Mode: java ${javaArgs.join(' ')}\n`);
+
+    this.process = spawn('java', javaArgs, {
       cwd: this.serverDir,
       stdio: ['pipe', 'pipe', 'pipe'],
+      detached: true,
       shell: false,
     });
 
     this.isRunning = true;
+    this.isDetached = false;
+    this.detachedPid = this.process.pid;
     this.emit('status-change', this.getStatus());
 
     this.process.stdout.on('data', (chunk) => {
@@ -93,6 +168,7 @@ class ServerRunner extends EventEmitter {
 
     this.process.on('close', (code, signal) => {
       this.isRunning = false;
+      this.isDetached = false;
       const msg = `[Manager] Server process exited with code ${code} (${signal || 'clean'})\n`;
       this._appendLog(msg);
       this.emit('log', { type: 'system', text: msg });
@@ -102,6 +178,7 @@ class ServerRunner extends EventEmitter {
 
     this.process.on('error', (err) => {
       this.isRunning = false;
+      this.isDetached = false;
       const msg = `[Manager] Failed to launch server: ${err.message}\n`;
       this._appendLog(msg);
       this.emit('log', { type: 'error', text: msg });
@@ -113,11 +190,29 @@ class ServerRunner extends EventEmitter {
   }
 
   /**
+   * Detach the managed process before Electron exits so the server survives
+   */
+  detachOnExit() {
+    if (this.process && this.isRunning) {
+      try {
+        this.process.stdout.destroy();
+        this.process.stderr.destroy();
+        this.process.stdin.destroy();
+        this.process.unref();
+      } catch {}
+    }
+  }
+
+  /**
    * Send console command to the server process stdin
    */
   sendCommand(cmd) {
-    if (!this.isRunning || !this.process || !this.process.stdin) {
+    if (!this.isRunning) {
       throw new Error('Server is not running');
+    }
+
+    if (this.isDetached || !this.process || !this.process.stdin) {
+      throw new Error('Server is running in an independent terminal window. Please use its console window directly.');
     }
 
     const clean = `${String(cmd).trim()}\n`;
@@ -130,32 +225,52 @@ class ServerRunner extends EventEmitter {
    * Stop the server gracefully
    */
   async stopServer(timeoutMs = 15000) {
-    if (!this.isRunning || !this.process) {
+    if (!this.isRunning) {
       return { success: true, message: 'Server was not running' };
     }
 
-    this._appendLog('[Manager] Stopping server gracefully (sending stop command)...\n');
-    try {
-      this.sendCommand('stop');
-    } catch {}
-
-    const proc = this.process;
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        if (this.isRunning && proc) {
-          this._appendLog('[Manager] Server did not stop in time; forcing termination...\n');
-          try {
-            proc.kill('SIGKILL');
-          } catch {}
-        }
-        resolve({ success: true, forced: true });
-      }, timeoutMs);
-
-      proc.once('close', () => {
-        clearTimeout(timer);
-        resolve({ success: true, forced: false });
+    // If running in detached mode with PID
+    if (this.isDetached && this.detachedPid) {
+      this._appendLog(`[Manager] Stopping detached server process (PID ${this.detachedPid})...\n`);
+      return new Promise((resolve) => {
+        exec(`taskkill /PID ${this.detachedPid} /T /F`, () => {
+          this.isRunning = false;
+          this.isDetached = false;
+          this.detachedPid = null;
+          this.emit('status-change', this.getStatus());
+          resolve({ success: true, detached: true });
+        });
       });
-    });
+    }
+
+    if (this.process) {
+      this._appendLog('[Manager] Stopping server gracefully (sending stop command)...\n');
+      try {
+        this.sendCommand('stop');
+      } catch {}
+
+      const proc = this.process;
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          if (this.isRunning && proc) {
+            this._appendLog('[Manager] Server did not stop in time; forcing termination...\n');
+            try {
+              proc.kill('SIGKILL');
+            } catch {}
+          }
+          resolve({ success: true, forced: true });
+        }, timeoutMs);
+
+        proc.once('close', () => {
+          clearTimeout(timer);
+          resolve({ success: true, forced: false });
+        });
+      });
+    }
+
+    this.isRunning = false;
+    this.emit('status-change', this.getStatus());
+    return { success: true };
   }
 
   _appendLog(text) {

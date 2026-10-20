@@ -12,6 +12,7 @@ const { HytaleAuthManager } = require('../src/main/hytaleAuth');
 const { ServerUpdater } = require('../src/main/serverUpdater');
 const { ServerInstaller } = require('../src/main/serverInstaller');
 const { ModManager } = require('../src/main/modManager');
+const { ServerRunner } = require('../src/main/serverRunner');
 const fsp = require('fs/promises');
 const os = require('os');
 
@@ -125,7 +126,18 @@ async function run() {
   assert(clientCheck.assetsPath !== null);
   console.log('  ✓ Successfully detected local client installation files');
 
-  console.log('\n🎉 ALL 10 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 11: Server Runner & Process Discovery
+  console.log('Test 11: Server Runner & Detached Process Discovery');
+  const runner = new ServerRunner({ serverDir: 'F:\\serverht\\Server' });
+  const initialStatus = runner.getStatus();
+  assert.strictEqual(typeof initialStatus.isRunning, 'boolean');
+  assert.strictEqual(initialStatus.serverDir, 'F:\\serverht\\Server');
+  const scanResult = await runner.findRunningServerProcess();
+  assert.strictEqual(typeof scanResult.isRunning, 'boolean');
+  console.log(`  Process scanner checked OS process table: isRunning=${scanResult.isRunning}, pid=${scanResult.pid}`);
+  console.log('  ✓ ServerRunner initialized and process detection query verified');
+
+  console.log('\n🎉 ALL 11 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

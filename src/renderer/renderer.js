@@ -78,10 +78,15 @@ const consoleInputForm = document.getElementById('console-input-form');
 const consoleInput = document.getElementById('console-input');
 const consoleAutoScroll = document.getElementById('console-autoscroll');
 const btnClearConsole = document.getElementById('btn-clear-console');
+const consoleLaunchMode = document.getElementById('console-launch-mode');
+const detachedModeNotice = document.getElementById('detached-mode-notice');
 
 // Settings Elements
 const settingsServerDir = document.getElementById('settings-server-dir');
 const btnBrowseServerDir = document.getElementById('btn-browse-server-dir');
+const settingsLaunchMode = document.getElementById('settings-launch-mode');
+const settingsMaxRam = document.getElementById('settings-max-ram');
+const settingsCloseToTray = document.getElementById('settings-close-to-tray');
 const settingsPatchline = document.getElementById('settings-patchline');
 const settingsCfApiKey = document.getElementById('settings-cf-api-key');
 const btnSaveSettings = document.getElementById('btn-save-settings');
@@ -190,6 +195,19 @@ async function init() {
     }
     if (appConfig.cfApiKey) {
       settingsCfApiKey.value = appConfig.cfApiKey;
+    }
+    if (appConfig.launchMode) {
+      if (consoleLaunchMode) consoleLaunchMode.value = appConfig.launchMode;
+      if (settingsLaunchMode) settingsLaunchMode.value = appConfig.launchMode;
+    }
+    if (appConfig.maxRam && settingsMaxRam) {
+      settingsMaxRam.value = appConfig.maxRam;
+    }
+    if (typeof appConfig.closeToTray === 'boolean' && settingsCloseToTray) {
+      settingsCloseToTray.checked = appConfig.closeToTray;
+    }
+    if (detachedModeNotice && appConfig.launchMode === 'detached') {
+      detachedModeNotice.classList.remove('hidden');
     }
 
     // Refresh components
@@ -1151,13 +1169,28 @@ function updateServerStatusUI(status) {
     sidebarServerBadge.textContent = 'Server Online';
     quickServerBtn.textContent = '⏹ Stop Server';
     quickServerBtn.className = 'btn btn-danger btn-sm';
-    dashServerStatus.textContent = `Running (PID: ${status.pid})`;
+    if (status.isDetached) {
+      dashServerStatus.textContent = `Running (Independent Window - PID: ${status.pid})`;
+      if (detachedModeNotice) detachedModeNotice.classList.remove('hidden');
+      consoleInput.placeholder = 'Server is running in external console window. Use its terminal window for commands.';
+      consoleInput.disabled = true;
+    } else {
+      dashServerStatus.textContent = `Running (PID: ${status.pid})`;
+      if (detachedModeNotice) detachedModeNotice.classList.add('hidden');
+      consoleInput.placeholder = 'Type a server command (e.g. help, list, stop)...';
+      consoleInput.disabled = false;
+    }
   } else {
     sidebarServerBadge.className = 'badge badge-offline';
     sidebarServerBadge.textContent = 'Server Offline';
     quickServerBtn.textContent = '▶ Start Server';
     quickServerBtn.className = 'btn btn-primary btn-sm';
     dashServerStatus.textContent = 'Stopped';
+    if (detachedModeNotice) {
+      detachedModeNotice.classList.toggle('hidden', consoleLaunchMode?.value !== 'detached');
+    }
+    consoleInput.placeholder = 'Type a server command (e.g. help, list, stop)...';
+    consoleInput.disabled = false;
   }
 }
 
@@ -1172,17 +1205,42 @@ quickServerBtn.addEventListener('click', async () => {
   } else {
     quickServerBtn.disabled = true;
     quickServerBtn.textContent = 'Starting...';
-    const res = await window.api.startServer();
+    const mode = consoleLaunchMode?.value || appConfig?.launchMode || 'integrated';
+    const maxRam = settingsMaxRam?.value || appConfig?.maxRam || '6G';
+    const res = await window.api.startServer({ mode, maxRam });
     quickServerBtn.disabled = false;
     if (res.error) {
       showToast(`Failed to start: ${res.error}`, 'error');
     } else {
-      showToast('Server starting!', 'success');
-      switchTab('console');
+      if (mode === 'detached') {
+        showToast('Server launched in independent terminal window!', 'success');
+      } else {
+        showToast('Server starting!', 'success');
+        switchTab('console');
+      }
     }
   }
   await refreshServerStatus();
 });
+
+if (consoleLaunchMode) {
+  consoleLaunchMode.addEventListener('change', () => {
+    const mode = consoleLaunchMode.value;
+    if (settingsLaunchMode) settingsLaunchMode.value = mode;
+    if (appConfig) appConfig.launchMode = mode;
+    if (detachedModeNotice) detachedModeNotice.classList.toggle('hidden', mode !== 'detached');
+    window.api.saveConfig(appConfig);
+  });
+}
+
+if (settingsLaunchMode) {
+  settingsLaunchMode.addEventListener('change', () => {
+    const mode = settingsLaunchMode.value;
+    if (consoleLaunchMode) consoleLaunchMode.value = mode;
+    if (appConfig) appConfig.launchMode = mode;
+    if (detachedModeNotice) detachedModeNotice.classList.toggle('hidden', mode !== 'detached');
+  });
+}
 
 // Stream Server Logs
 window.api.onServerLog((entry) => {
@@ -1255,9 +1313,18 @@ btnBrowseServerDir.addEventListener('click', async () => {
 btnSaveSettings.addEventListener('click', async () => {
   const patchline = settingsPatchline.value;
   const cfApiKey = settingsCfApiKey.value.trim();
+  const launchMode = settingsLaunchMode ? settingsLaunchMode.value : 'integrated';
+  const maxRam = settingsMaxRam ? settingsMaxRam.value : '6G';
+  const closeToTray = settingsCloseToTray ? settingsCloseToTray.checked : true;
 
   appConfig.patchline = patchline;
   appConfig.cfApiKey = cfApiKey;
+  appConfig.launchMode = launchMode;
+  appConfig.maxRam = maxRam;
+  appConfig.closeToTray = closeToTray;
+
+  if (consoleLaunchMode) consoleLaunchMode.value = launchMode;
+  if (detachedModeNotice) detachedModeNotice.classList.toggle('hidden', launchMode !== 'detached');
 
   await window.api.saveConfig(appConfig);
   showToast('Settings saved successfully!', 'success');

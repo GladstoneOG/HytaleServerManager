@@ -16,6 +16,7 @@ function registerIpcHandlers({
   serverInstaller,
   modManager,
   serverRunner,
+  trayManager,
   cfClient,
   tsClient,
 }) {
@@ -27,6 +28,10 @@ function registerIpcHandlers({
       cfApiKey: '',
       theme: 'dark',
       activeTab: 'dashboard',
+      launchMode: 'integrated',
+      closeToTray: true,
+      maxRam: '6G',
+      minRam: '4G',
     });
   }
 
@@ -37,6 +42,9 @@ function registerIpcHandlers({
       serverUpdater.setServerDir(cfg.serverDir);
       modManager.setServerDir(cfg.serverDir);
       serverRunner.setServerDir(cfg.serverDir);
+    }
+    if (trayManager && typeof cfg.closeToTray === 'boolean') {
+      trayManager.closeToTrayEnabled = cfg.closeToTray;
     }
   }
 
@@ -263,13 +271,27 @@ function registerIpcHandlers({
   });
 
   // --- Server Runner / Console ---
-  ipcMain.handle('server:status', () => {
+  ipcMain.handle('server:status', async () => {
+    await serverRunner.findRunningServerProcess();
     return serverRunner.getStatus();
   });
 
-  ipcMain.handle('server:start', async (_, opts) => {
+  ipcMain.handle('server:start', async (_, opts = {}) => {
     try {
-      return await serverRunner.startServer(opts);
+      const cfg = await getAppConfig();
+      const mode = opts.mode || cfg.launchMode || 'integrated';
+      const maxRam = opts.maxRam || cfg.maxRam || '6G';
+      const minRam = opts.minRam || cfg.minRam || '4G';
+      const jvmOptions = opts.jvmOptions || [
+        `-Xms${minRam}`,
+        `-Xmx${maxRam}`,
+        '-XX:+UseG1GC',
+      ];
+      return await serverRunner.startServer({
+        mode,
+        jvmOptions,
+        extraArgs: opts.extraArgs || [],
+      });
     } catch (e) {
       return { error: e.message };
     }
