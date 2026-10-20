@@ -1,0 +1,36 @@
+{
+  "name": "hytale-server-manager",
+  "productName": "Hytale Server Manager",
+  "version": "1.0.0",
+  "description": "One-click mod manager and auto-updater for Hytale dedicated servers (CurseForge, Thunderstore, Hytale).",
+  "main": "src/main/main.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GladstoneOG/HytaleServerManager.git"
+  },
+  "keywords": [
+    "hytale",
+    "hytale-server",
+    "mod-manager",
+    "curseforge",
+    "thunderstore",
+    "auto-updater"
+  ],
+  "author": "GladstoneOG",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/GladstoneOG/HytaleServerManager/issues"
+  },
+  "homepage": "https://github.com/GladstoneOG/HytaleServerManager#readme",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/run-tests.js"
+  },
+  "dependencies": {
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "electron": "^38.8.6"
+  }
+}
+

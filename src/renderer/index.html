@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hytale Server Mod Manager</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-logo">⚔️</div>
+          <div class="brand-info">
+            <span class="brand-title">Hytale Server</span>
+            <span class="brand-subtitle">Mod Manager & Updater</span>
+          </div>
+        </div>
+        <div class="server-badge-container">
+          <span id="sidebar-server-badge" class="badge badge-offline">Server Offline</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-tab="dashboard">
+          <span class="icon">📊</span>
+          <span class="label">Dashboard</span>
+        </button>
+        <button class="nav-item" data-tab="installed-mods">
+          <span class="icon">📦</span>
+          <span class="label">Installed Mods</span>
+          <span id="installed-mods-count" class="counter-pill">0</span>
+        </button>
+        <button class="nav-item" data-tab="curseforge">
+          <span class="icon">🔨</span>
+          <span class="label">CurseForge</span>
+        </button>
+        <button class="nav-item" data-tab="thunderstore">
+          <span class="icon">⚡</span>
+          <span class="label">Thunderstore</span>
+        </button>
+        <button class="nav-item" data-tab="profiles">
+          <span class="icon">📑</span>
+          <span class="label">Profiles</span>
+        </button>
+        <button class="nav-item" data-tab="console">
+          <span class="icon">💻</span>
+          <span class="label">Server Console</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="icon">⚙️</span>
+          <span class="label">Settings & Auth</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="account-pill" id="sidebar-account-pill">
+          <span class="account-dot dot-gray"></span>
+          <span class="account-name" id="sidebar-account-text">Checking Auth...</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Global Bar -->
+      <header class="top-bar">
+        <div class="top-bar-left">
+          <h1 id="page-title">Dashboard</h1>
+        </div>
+        <div class="top-bar-right">
+          <div class="quick-server-control">
+            <button id="quick-server-btn" class="btn btn-primary btn-sm">▶ Start Server</button>
+          </div>
+          <button id="open-server-folder-btn" class="btn btn-secondary btn-sm" title="Open Server Folder">
+            📁 Open Folder
+          </button>
+        </div>
+      </header>
+
+      <!-- Toast Notification Container -->
+      <div id="toast-container" class="toast-container"></div>
+
+      <!-- Tab Content Area -->
+      <div class="content-body">
+
+        <!-- ================= DASHBOARD TAB ================= -->
+        <section id="tab-dashboard" class="tab-pane active">
+          <!-- Update Banner (Conditional) -->
+          <div id="server-update-banner" class="banner banner-update hidden">
+            <div class="banner-icon">🚀</div>
+            <div class="banner-content">
+              <h3>Hytale Server Update Available!</h3>
+              <p id="update-banner-desc">A new server version (<strong id="target-version-tag">0.7.2</strong>) is ready to install.</p>
+              <div id="update-progress-container" class="progress-wrap hidden">
+                <div class="progress-bar">
+                  <div id="update-progress-fill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="update-progress-text" class="progress-status-text">Preparing update...</div>
+              </div>
+            </div>
+            <div class="banner-actions">
+              <button id="btn-update-server-now" class="btn btn-accent">One-Click Update Now</button>
+            </div>
+          </div>
+
+          <div class="grid-2-col">
+            <!-- Server Status Card -->
+            <div class="card">
+              <div class="card-header">
+                <h3>🖥️ Server Overview</h3>
+                <span id="dash-version-badge" class="badge badge-info">v0.7.1</span>
+              </div>
+              <div class="card-body">
+                <div class="info-row">
+                  <span class="info-label">Server Folder:</span>
+                  <span class="info-value code" id="dash-server-dir">F:\serverht\Server</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Current Version:</span>
+                  <span class="info-value" id="dash-installed-ver">Detecting...</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Upstream Latest:</span>
+                  <span class="info-value" id="dash-upstream-ver">Checking...</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Active Profile:</span>
+                  <span class="info-value" id="dash-active-profile">Default</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Server Status:</span>
+                  <span class="info-value" id="dash-server-status">Stopped</span>
+                </div>
+
+                <div class="card-actions-row">
+                  <button id="btn-check-updates" class="btn btn-secondary btn-sm">🔄 Check Version</button>
+                  <button id="btn-dash-open-mods" class="btn btn-secondary btn-sm">📦 View Mods</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hytale Account / Downloader Card -->
+            <div class="card">
+              <div class="card-header">
+                <h3>🔑 Hytale Account Connection</h3>
+                <span id="dash-auth-status-badge" class="badge badge-warning">Unlinked</span>
+              </div>
+              <div class="card-body">
+                <p class="card-desc">
+                  Connect your Hytale account to enable seamless 1-click automatic server updates without using the command-line downloader.
+                </p>
+                <div class="info-row">
+                  <span class="info-label">Credentials File:</span>
+                  <span class="info-value code" id="dash-creds-file">Searching...</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Branch / Patchline:</span>
+                  <span class="info-value" id="dash-creds-branch">release</span>
+                </div>
+
+                <div class="card-actions-row">
+                  <button id="btn-dash-login-hytale" class="btn btn-primary btn-sm">🔗 Connect Hytale Account</button>
+                  <button id="btn-dash-refresh-auth" class="btn btn-secondary btn-sm">🔄 Refresh Auth</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mod Stats Overview -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-val" id="stat-total-mods">0</div>
+              <div class="stat-lbl">Installed Mods</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val text-success" id="stat-enabled-mods">0</div>
+              <div class="stat-lbl">Active & Enabled</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val text-warning" id="stat-updates-mods">0</div>
+              <div class="stat-lbl">Updates Available</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val" id="stat-active-profiles">1</div>
+              <div class="stat-lbl">Profiles Configured</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= INSTALLED MODS TAB ================= -->
+        <section id="tab-installed-mods" class="tab-pane">
+          <div class="toolbar">
+            <div class="toolbar-search">
+              <input type="text" id="mods-search-input" class="input-text" placeholder="Search installed mods...">
+            </div>
+            <div class="toolbar-filters">
+              <select id="mods-filter-status" class="input-select">
+                <option value="all">All Mods</option>
+                <option value="enabled">Enabled Only</option>
+                <option value="disabled">Disabled Only</option>
+                <option value="updates">Updates Available</option>
+              </select>
+            </div>
+            <div class="toolbar-actions">
+              <button id="btn-update-all-mods" class="btn btn-accent btn-sm hidden">⚡ Update All</button>
+              <button id="btn-refresh-installed-mods" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+              <button id="btn-open-mods-folder" class="btn btn-secondary btn-sm">📁 Mods Folder</button>
+            </div>
+          </div>
+
+          <div id="installed-mods-list" class="mods-list">
+            <div class="empty-state">
+              <div class="empty-icon">⏳</div>
+              <p>Scanning installed mods in Server/mods...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= CURSEFORGE BROWSER TAB ================= -->
+        <section id="tab-curseforge" class="tab-pane">
+          <div class="toolbar">
+            <div class="toolbar-search">
+              <input type="text" id="cf-search-input" class="input-text" placeholder="Search CurseForge Hytale mods...">
+            </div>
+            <div class="toolbar-filters">
+              <select id="cf-category-select" class="input-select">
+                <option value="">All Categories</option>
+              </select>
+              <select id="cf-sort-select" class="input-select">
+                <option value="2">Most Popular</option>
+                <option value="5">Total Downloads</option>
+                <option value="3">Recently Updated</option>
+                <option value="1">Featured</option>
+                <option value="4">Name</option>
+              </select>
+            </div>
+            <div class="toolbar-actions">
+              <button id="btn-cf-search" class="btn btn-primary btn-sm">🔍 Search</button>
+            </div>
+          </div>
+
+          <div id="cf-results-grid" class="mods-grid">
+            <div class="empty-state">
+              <div class="empty-icon">🔨</div>
+              <p>Loading CurseForge mods for Hytale...</p>
+            </div>
+          </div>
+
+          <div class="pagination-bar" id="cf-pagination">
+            <button id="cf-prev-page" class="btn btn-secondary btn-sm" disabled>« Previous</button>
+            <span id="cf-page-info">Page 1</span>
+            <button id="cf-next-page" class="btn btn-secondary btn-sm">Next »</button>
+          </div>
+        </section>
+
+        <!-- ================= THUNDERSTORE BROWSER TAB ================= -->
+        <section id="tab-thunderstore" class="tab-pane">
+          <div class="toolbar">
+            <div class="toolbar-search">
+              <input type="text" id="ts-search-input" class="input-text" placeholder="Search Thunderstore Hytale packages...">
+            </div>
+            <div class="toolbar-filters">
+              <select id="ts-sort-select" class="input-select">
+                <option value="downloads">Most Downloads</option>
+                <option value="updated">Recently Updated</option>
+                <option value="name">Name</option>
+              </select>
+            </div>
+            <div class="toolbar-actions">
+              <button id="btn-ts-search" class="btn btn-primary btn-sm">🔍 Search</button>
+              <button id="btn-ts-refresh" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+            </div>
+          </div>
+
+          <div id="ts-results-grid" class="mods-grid">
+            <div class="empty-state">
+              <div class="empty-icon">⚡</div>
+              <p>Loading Thunderstore Hytale packages...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= PROFILES TAB ================= -->
+        <section id="tab-profiles" class="tab-pane">
+          <div class="toolbar">
+            <div class="toolbar-actions">
+              <button id="btn-create-profile" class="btn btn-primary btn-sm">+ New Profile from Current</button>
+              <button id="btn-import-profile" class="btn btn-secondary btn-sm">📥 Import Profile JSON</button>
+            </div>
+          </div>
+
+          <div id="profiles-list" class="profiles-grid">
+            <!-- Dynamic profiles -->
+          </div>
+        </section>
+
+        <!-- ================= SERVER CONSOLE TAB ================= -->
+        <section id="tab-console" class="tab-pane">
+          <div class="console-wrapper">
+            <div class="console-header">
+              <div class="console-title">
+                <span class="console-dot dot-green"></span>
+                <span>Server Output & Control</span>
+              </div>
+              <div class="console-actions">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="console-autoscroll" checked> Auto-Scroll
+                </label>
+                <button id="btn-clear-console" class="btn btn-secondary btn-xs">Clear Output</button>
+              </div>
+            </div>
+
+            <div id="console-output" class="console-output">
+              <div class="console-line system">[Manager] Ready. Start the server using the button above to begin streaming logs.</div>
+            </div>
+
+            <form id="console-input-form" class="console-input-bar">
+              <span class="console-prompt">&gt;</span>
+              <input type="text" id="console-input" class="console-text-input" placeholder="Type a server command (e.g. help, list, stop)..." autocomplete="off">
+              <button type="submit" class="btn btn-primary btn-sm">Send</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- ================= SETTINGS & AUTH TAB ================= -->
+        <section id="tab-settings" class="tab-pane">
+          <div class="card max-w-700">
+            <div class="card-header">
+              <h3>⚙️ Server Configuration</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>Hytale Server Directory</label>
+                <div class="input-with-button">
+                  <input type="text" id="settings-server-dir" class="input-text" readonly value="F:\serverht\Server">
+                  <button id="btn-browse-server-dir" class="btn btn-secondary">Browse...</button>
+                </div>
+                <small class="form-help">Points to the directory containing <code>HytaleServer.jar</code> and <code>mods/</code>.</small>
+              </div>
+
+              <div class="form-group">
+                <label>Update Patchline</label>
+                <select id="settings-patchline" class="input-select">
+                  <option value="release">release (Standard)</option>
+                  <option value="pre-release">pre-release (Beta / Snapshot)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>CurseForge API Key (Optional)</label>
+                <input type="password" id="settings-cf-api-key" class="input-text" placeholder="Leave empty to use built-in proxy (Recommended)">
+                <small class="form-help">Our built-in proxy handles Hytale CurseForge searches without an API key. You can provide your own key if desired.</small>
+              </div>
+
+              <div class="card-actions-row">
+                <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card max-w-700 mt-20">
+            <div class="card-header">
+              <h3>🔑 Hytale Account Authentication</h3>
+            </div>
+            <div class="card-body">
+              <div id="device-login-display" class="hidden login-box">
+                <h4>Device Code Authorization</h4>
+                <p>Please authorize this application using the code below:</p>
+                <div class="user-code-display" id="login-user-code">--------</div>
+                <p class="login-subtext">A browser window has opened to approve this device code. If not, click below:</p>
+                <div class="card-actions-row">
+                  <button id="btn-open-verify-url" class="btn btn-accent btn-sm">🌐 Open Verification Page</button>
+                  <button id="btn-cancel-login" class="btn btn-secondary btn-sm">Cancel</button>
+                </div>
+                <div class="polling-indicator">
+                  <span class="spinner"></span> Waiting for browser approval...
+                </div>
+              </div>
+
+              <div id="auth-info-display">
+                <p class="card-desc">
+                  This tool connects to Hytale's official OAuth service via standard Device Code flow. Your tokens are stored securely in <code>.hytale-downloader-credentials.json</code>.
+                </p>
+                <button id="btn-trigger-device-login" class="btn btn-primary">Connect Hytale Account</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Mod Details Modal -->
+  <div id="mod-modal" class="modal-overlay hidden">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3 id="modal-mod-title">Mod Details</h3>
+        <button id="modal-close-btn" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-mod-content">
+        <!-- Dynamic mod description -->
+      </div>
+      <div class="modal-footer" id="modal-mod-footer">
+        <!-- Install or Update button -->
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

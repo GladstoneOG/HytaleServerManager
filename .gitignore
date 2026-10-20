@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+package-lock.json.backup
+
+# Production & Build outputs
+dist/
+build/
+out/
+bin/
+
+# Temporary / In-progress files
+*.tmp
+*.extracting
+*.part
+*.bak
+
+# Cache & Download artifacts
+.cache/
+downloads/
+updater_backups/
+backups/
+
+# Local Server Metadata & Profiles (user specific)
+.hytale_mod_manager.json
+.mod_profiles/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# CRITICAL: Credentials, Tokens & Secrets (NEVER COMMIT)
+.hytale-downloader-credentials.json
+*credentials*
+*token*
+*secret*
+auth.enc
+*.env
+*.env.*
+*.env.local
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.suo
+*.user

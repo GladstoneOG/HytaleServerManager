@@ -1,0 +1,310 @@
+'use strict';
+/**
+ * Electron IPC Handler Registration
+ * Connects frontend UI actions with backend services.
+ */
+const { ipcMain, dialog, shell } = require('electron');
+const path = require('path');
+const fsp = require('fs/promises');
+const { readJson, writeJsonAtomic, ensureDir } = require('./util');
+
+function registerIpcHandlers({
+  win,
+  appConfigPath,
+  authManager,
+  serverUpdater,
+  modManager,
+  serverRunner,
+  cfClient,
+  tsClient,
+}) {
+  // Config helper
+  async function getAppConfig() {
+    return await readJson(appConfigPath, {
+      serverDir: 'F:\\serverht\\Server',
+      patchline: 'release',
+      cfApiKey: '',
+      theme: 'dark',
+      activeTab: 'dashboard',
+    });
+  }
+
+  async function saveAppConfig(cfg) {
+    await writeJsonAtomic(appConfigPath, cfg);
+    if (cfg.serverDir) {
+      authManager.setServerDir(cfg.serverDir);
+      serverUpdater.setServerDir(cfg.serverDir);
+      modManager.setServerDir(cfg.serverDir);
+      serverRunner.setServerDir(cfg.serverDir);
+    }
+  }
+
+  // --- App Settings ---
+  ipcMain.handle('app:get-config', async () => {
+    return await getAppConfig();
+  });
+
+  ipcMain.handle('app:save-config', async (_, cfg) => {
+    await saveAppConfig(cfg);
+    return { success: true };
+  });
+
+  ipcMain.handle('dialog:select-server-dir', async () => {
+    const res = await dialog.showOpenDialog(win, {
+      title: 'Select Hytale Server Folder',
+      properties: ['openDirectory'],
+      defaultPath: 'F:\\serverht\\Server',
+    });
+    if (!res.canceled && res.filePaths.length > 0) {
+      const selected = res.filePaths[0];
+      const cfg = await getAppConfig();
+      cfg.serverDir = selected;
+      await saveAppConfig(cfg);
+      return selected;
+    }
+    return null;
+  });
+
+  ipcMain.handle('system:open-path', async (_, p) => {
+    if (p) await shell.openPath(p);
+  });
+
+  ipcMain.handle('system:open-external', async (_, url) => {
+    if (url) await shell.openExternal(url);
+  });
+
+  // --- Hytale Auth ---
+  ipcMain.handle('hytale:get-status', async () => {
+    return await authManager.getStatus();
+  });
+
+  let activeLoginAbort = null;
+  ipcMain.handle('hytale:start-device-login', async () => {
+    const deviceAuth = await authManager.startDeviceLogin();
+    // Automatically open verification URL in user's browser
+    if (deviceAuth.verification_uri_complete) {
+      shell.openExternal(deviceAuth.verification_uri_complete).catch(() => {});
+    }
+    return deviceAuth;
+  });
+
+  ipcMain.handle('hytale:poll-device-login', async (_, deviceAuth) => {
+    if (activeLoginAbort) activeLoginAbort.abort();
+    activeLoginAbort = new AbortController();
+
+    try {
+      const creds = await authManager.pollDeviceLogin(deviceAuth, {
+        signal: activeLoginAbort.signal,
+        onPoll: (info) => {
+          win.webContents.send('hytale:login-progress', info);
+        },
+      });
+      return { success: true, creds };
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      activeLoginAbort = null;
+    }
+  });
+
+  ipcMain.handle('hytale:cancel-login', () => {
+    if (activeLoginAbort) {
+      activeLoginAbort.abort();
+      activeLoginAbort = null;
+    }
+    return { success: true };
+  });
+
+  // --- Server Updater ---
+  ipcMain.handle('server:check-version', async (_, patchline = 'release') => {
+    try {
+      return await serverUpdater.checkForUpdates(patchline);
+    } catch (e) {
+      return {
+        error: e.message,
+        installed: false,
+        updateAvailable: false,
+      };
+    }
+  });
+
+  let activeUpdateAbort = null;
+  ipcMain.handle('server:perform-update', async (_, patchline = 'release') => {
+    if (activeUpdateAbort) activeUpdateAbort.abort();
+    activeUpdateAbort = new AbortController();
+
+    try {
+      const res = await serverUpdater.updateServer({
+        patchline,
+        signal: activeUpdateAbort.signal,
+        onProgress: (p) => {
+          win.webContents.send('server:update-progress', p);
+        },
+      });
+      return { success: true, ...res };
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      activeUpdateAbort = null;
+    }
+  });
+
+  // --- Mod Management ---
+  ipcMain.handle('mods:list', async (_, checkRemoteUpdates = true) => {
+    return await modManager.getInstalledMods(checkRemoteUpdates);
+  });
+
+  ipcMain.handle('mods:set-enabled', async (_, fileName, enable) => {
+    return await modManager.setModEnabled(fileName, enable);
+  });
+
+  ipcMain.handle('mods:delete', async (_, fileName, deleteConfigDir = false) => {
+    return await modManager.deleteMod(fileName, deleteConfigDir);
+  });
+
+  ipcMain.handle('mods:update', async (_, item) => {
+    try {
+      const res = await modManager.updateMod(item, {
+        onProgress: (p) => win.webContents.send('mods:action-progress', p),
+      });
+      return { success: true, ...res };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  // --- CurseForge ---
+  ipcMain.handle('cf:search', async (_, params) => {
+    return await cfClient.searchMods(params);
+  });
+
+  ipcMain.handle('cf:categories', async () => {
+    return await cfClient.getCategories();
+  });
+
+  ipcMain.handle('cf:get-mod', async (_, modId) => {
+    return await cfClient.getMod(modId);
+  });
+
+  ipcMain.handle('cf:get-description', async (_, modId) => {
+    return await cfClient.getModDescription(modId);
+  });
+
+  ipcMain.handle('cf:install', async (_, modObj, fileObj, installDeps = true) => {
+    try {
+      const res = await modManager.installCurseForgeMod(modObj, fileObj, {
+        installDeps,
+        onProgress: (p) => win.webContents.send('mods:action-progress', p),
+      });
+      return { success: true, ...res };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  // --- Thunderstore ---
+  ipcMain.handle('ts:search', async (_, params) => {
+    return await tsClient.searchPackages(params);
+  });
+
+  ipcMain.handle('ts:install', async (_, pkgInfo) => {
+    try {
+      const res = await modManager.installThunderstoreMod(pkgInfo, {
+        onProgress: (p) => win.webContents.send('mods:action-progress', p),
+      });
+      return { success: true, ...res };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  // --- Profiles ---
+  ipcMain.handle('profiles:list', async () => {
+    return await modManager.getProfiles();
+  });
+
+  ipcMain.handle('profiles:create', async (_, name, desc) => {
+    return await modManager.createProfile(name, desc);
+  });
+
+  ipcMain.handle('profiles:activate', async (_, name) => {
+    return await modManager.activateProfile(name);
+  });
+
+  ipcMain.handle('profiles:export-dialog', async (_, name) => {
+    const res = await dialog.showSaveDialog(win, {
+      title: `Export Profile: ${name}`,
+      defaultPath: `${name}.hytale-profile.json`,
+      filters: [{ name: 'JSON Profile', extensions: ['json'] }],
+    });
+    if (!res.canceled && res.filePath) {
+      await modManager.exportProfile(name, res.filePath);
+      return { success: true, path: res.filePath };
+    }
+    return { canceled: true };
+  });
+
+  ipcMain.handle('profiles:import-dialog', async () => {
+    const res = await dialog.showOpenDialog(win, {
+      title: 'Import Profile File',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON Profile', extensions: ['json'] }],
+    });
+    if (!res.canceled && res.filePaths.length > 0) {
+      const filePath = res.filePaths[0];
+      const result = await modManager.importProfile(filePath, {
+        autoDownload: true,
+        onProgress: (p) => win.webContents.send('mods:action-progress', p),
+      });
+      return { success: true, ...result };
+    }
+    return { canceled: true };
+  });
+
+  // --- Server Runner / Console ---
+  ipcMain.handle('server:status', () => {
+    return serverRunner.getStatus();
+  });
+
+  ipcMain.handle('server:start', async (_, opts) => {
+    try {
+      return await serverRunner.startServer(opts);
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('server:stop', async () => {
+    return await serverRunner.stopServer();
+  });
+
+  ipcMain.handle('server:send-command', (_, cmd) => {
+    try {
+      serverRunner.sendCommand(cmd);
+      return { success: true };
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('server:get-logs', () => {
+    return serverRunner.getLogs();
+  });
+
+  // Forward server runner events to UI
+  serverRunner.on('log', (entry) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('server:log', entry);
+    }
+  });
+
+  serverRunner.on('status-change', (status) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('server:status-change', status);
+    }
+  });
+}
+
+module.exports = {
+  registerIpcHandlers,
+};
