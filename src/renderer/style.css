@@ -390,6 +390,12 @@ summary,
   gap: 10px;
 }
 
+/* Hide duplicate topbar Start button on Overview since Overview hero card already has it */
+.app[data-active-tab="overview"] #quick-server-btn,
+#quick-server-btn.is-overview-hidden {
+  display: none !important;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -504,6 +510,36 @@ summary,
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
+}
+
+.btn-start {
+  background: #10b981;
+  color: #051b11;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+.btn-start:hover:not(:disabled) {
+  background: #34d399;
+  color: #04140d;
+}
+
+.btn-stop {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.btn-stop:hover:not(:disabled) {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.btn-update {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: rgba(2, 132, 199, 0.4);
+}
+.btn-update:hover:not(:disabled) {
+  background: #0369a1;
+  color: #ffffff;
 }
 
 .btn-secondary {
@@ -1192,6 +1228,170 @@ summary,
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Batch bar for multi-selection */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+}
+
+.batch-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.batch-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.batch-checkbox-wrap input[type="checkbox"],
+.mod-select-wrap input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.batch-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mod-select-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mod-row-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.mod-row-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Browse Advanced Filters */
+.filters-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 16px;
+}
+
+.filters-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filters-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filters-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 110px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+  user-select: none;
+}
+
+.filter-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.filter-chip.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.filters-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: space-between;
+  border-left: 1px solid var(--border);
+  padding-left: 16px;
+}
+
+.filters-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.text-xs {
+  font-size: 11.5px;
 }
 
 .list {

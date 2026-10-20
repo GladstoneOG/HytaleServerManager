@@ -1,5 +1,8 @@
 @echo off
-title Hytale Server Mod Manager
 cd /d "%~dp0"
-echo Starting Hytale Server Mod Manager...
-call npx electron .
+if exist "node_modules\electron\dist\electron.exe" (
+    start "" "node_modules\electron\dist\electron.exe" . %*
+    exit /b 0
+)
+start "" npx electron . %*
+exit /b 0

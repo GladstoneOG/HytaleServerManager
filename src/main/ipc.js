@@ -82,25 +82,26 @@ function registerIpcHandlers({
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) await shell.openExternal(url);
   });
 
-  // --- Launch at login (starts hidden in the tray) ---
-  function loginItemOptions() {
-    // In development the app runs via electron.exe, so the app path must be passed explicitly
+  // --- Launch at login (with configurable start-hidden flag) ---
+  function loginItemOptions(openAsHidden = true) {
+    const args = openAsHidden ? ['--hidden'] : [];
     return app.isPackaged
-      ? { path: process.execPath, args: ['--hidden'] }
-      : { path: process.execPath, args: [app.getAppPath(), '--hidden'] };
+      ? { path: process.execPath, args }
+      : { path: process.execPath, args: [app.getAppPath(), ...args] };
   }
 
   ipcMain.handle('app:get-login-item', () => {
     try {
-      return { openAtLogin: app.getLoginItemSettings(loginItemOptions()).openAtLogin };
+      const s = app.getLoginItemSettings(loginItemOptions(true));
+      return { openAtLogin: Boolean(s.openAtLogin) };
     } catch {
       return { openAtLogin: false };
     }
   });
 
-  ipcMain.handle('app:set-login-item', (_, enabled) => {
+  ipcMain.handle('app:set-login-item', (_, enabled, openAsHidden = true) => {
     try {
-      app.setLoginItemSettings({ openAtLogin: !!enabled, ...loginItemOptions() });
+      app.setLoginItemSettings({ openAtLogin: !!enabled, ...loginItemOptions(openAsHidden) });
       return { success: true };
     } catch (e) {
       return { success: false, error: e.message };

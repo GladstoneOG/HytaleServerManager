@@ -83,6 +83,7 @@ class ServerRunner extends EventEmitter {
             '-Command',
             "Get-CimInstance Win32_Process -Filter \"(Name = 'java.exe' OR Name = 'javaw.exe') AND CommandLine LIKE '%HytaleServer.jar%'\" | Select-Object -ExpandProperty ProcessId",
           ],
+          { windowsHide: true },
           (err, stdout) => {
             if (err || !stdout || !stdout.trim()) {
               if (!this.process) {
@@ -372,7 +373,7 @@ class ServerRunner extends EventEmitter {
       const pidToKill = this.detachedPid;
       this._appendLog(`[Manager] Stopping detached server process (PID ${pidToKill})...\n`);
       return new Promise((resolve) => {
-        exec(`taskkill /PID ${pidToKill} /F /T`, () => {
+        exec(`taskkill /PID ${pidToKill} /F /T`, { windowsHide: true }, () => {
           this.isRunning = false;
           this.isDetached = false;
           this.detachedPid = null;
@@ -406,7 +407,7 @@ class ServerRunner extends EventEmitter {
         const timer = setTimeout(() => {
           if (proc && proc.pid) {
             this._appendLog('[Manager] Graceful stop timed out; force terminating process...\n');
-            exec(`taskkill /PID ${proc.pid} /F /T`, () => cleanup(true));
+            exec(`taskkill /PID ${proc.pid} /F /T`, { windowsHide: true }, () => cleanup(true));
           } else {
             cleanup(true);
           }

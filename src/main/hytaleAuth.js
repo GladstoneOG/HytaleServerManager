@@ -278,6 +278,71 @@ class HytaleAuthManager {
   }
 
   /**
+   * Try to detect the local player name from the official Hytale launcher log if present
+   */
+  async getLocalPlayerName() {
+    try {
+      const appData = process.env.APPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Roaming') : null);
+      if (!appData) return null;
+      const logPath = path.join(appData, 'Hytale', 'hytale-launcher.log');
+      if (await exists(logPath)) {
+        const content = await fsp.readFile(logPath, 'utf8');
+        const m = /--name\s+([A-Za-z0-9_]+)/.exec(content) || /user\s+([A-Za-z0-9_]+)/.exec(content);
+        if (m && m[1]) return m[1];
+      }
+    } catch {}
+    return null;
+  }
+
+  /**
+   * Query OpenID Connect userinfo endpoint
+   */
+  async fetchUserInfo(accessToken) {
+    try {
+      return await getJson(`${OAUTH_BASE}/userinfo`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 8000,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Resolve account display name and email
+   */
+  async resolveAccountProfile(creds) {
+    let username = creds.username || null;
+    let email = creds.email || null;
+
+    if (!username) {
+      username = await this.getLocalPlayerName();
+    }
+
+    if (!email && creds.access_token) {
+      const info = await this.fetchUserInfo(creds.access_token);
+      if (info) {
+        email = info.email || null;
+        if (!username) {
+          username = info.name || info.preferred_username || (info.email ? info.email.split('@')[0] : null);
+        }
+      }
+    }
+
+    if (!username && email) {
+      username = email.split('@')[0];
+    }
+
+    if ((username && username !== creds.username) || (email && email !== creds.email)) {
+      creds.username = username;
+      creds.email = email;
+      await this.saveCredentials(creds).catch(() => {});
+    }
+
+    return { username, email };
+  }
+
+  /**
    * Get account status summary
    */
   async getStatus() {
@@ -290,6 +355,8 @@ class HytaleAuthManager {
     const expiresAt = creds.expires_at || 0;
     const isExpired = expiresAt > 0 && expiresAt <= now;
 
+    const profile = await this.resolveAccountProfile(creds);
+
     return {
       authenticated: true,
       credentialsPath: this.credentialsPath,
@@ -297,6 +364,8 @@ class HytaleAuthManager {
       expiresAt: creds.expires_at,
       isExpired,
       hasRefreshToken: !!creds.refresh_token,
+      username: profile.username || 'Hytale Player',
+      email: profile.email || null,
     };
   }
 }

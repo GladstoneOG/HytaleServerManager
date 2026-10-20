@@ -128,7 +128,7 @@ Before installing the manager, ensure you have:
    ```
 
 > [!TIP]
-> On Windows, you can double-click [`start.bat`](start.bat) inside the project folder or run the shortcut from your server directory.
+> On Windows, you can double-click [`HytaleServerManager.vbs`](HytaleServerManager.vbs) to launch cleanly without any command prompt window, or run [`start.bat`](start.bat).
 
 ---
 

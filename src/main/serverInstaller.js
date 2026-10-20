@@ -28,7 +28,7 @@ class ServerInstaller {
    */
   async checkJava() {
     return new Promise((resolve) => {
-      exec('java -version', (err, stdout, stderr) => {
+      exec('java -version', { windowsHide: true }, (err, stdout, stderr) => {
         if (err) {
           return resolve({
             installed: false,

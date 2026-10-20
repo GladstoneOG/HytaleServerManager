@@ -131,10 +131,15 @@ async function createWindow() {
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   // Show only after first paint to avoid a blank/white flash
-  mainWindow.once('ready-to-show', () => {
+  mainWindow.once('ready-to-show', async () => {
     if (!startHidden) {
       mainWindow.show();
       mainWindow.focus();
+    }
+    // Auto-start server if enabled in persistent settings
+    if (appConfig.autoStartServer && !serverRunner.isRunning) {
+      const opts = await getStartOptions();
+      serverRunner.start(opts).catch(() => {});
     }
   });
 

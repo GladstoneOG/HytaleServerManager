@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('api', {
   openPath: (p) => ipcRenderer.invoke('system:open-path', p),
   openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
   getLoginItem: () => ipcRenderer.invoke('app:get-login-item'),
-  setLoginItem: (enabled) => ipcRenderer.invoke('app:set-login-item', enabled),
+  setLoginItem: (enabled, openAsHidden) => ipcRenderer.invoke('app:set-login-item', enabled, openAsHidden),
 
   // Hytale Account
   getHytaleStatus: () => ipcRenderer.invoke('hytale:get-status'),

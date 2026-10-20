@@ -127,6 +127,7 @@ class ModManager {
         source: savedMeta.source || 'local',
         remoteId: savedMeta.remoteId || null,
         remoteVersion: savedMeta.remoteVersion || null,
+        iconUrl: savedMeta.iconUrl || null,
         updateAvailable: false,
         latestRemoteFile: null,
       };
@@ -180,26 +181,38 @@ class ModManager {
 
     // Check updates for already-identified CurseForge mods
     if (checkRemoteUpdates && this.cf) {
+      let metaChanged = false;
       for (const item of installed) {
-        if (item.source === 'curseforge' && item.remoteId && !item.updateAvailable) {
+        if (item.source === 'curseforge' && item.remoteId) {
           try {
             const modInfo = await this.cf.getMod(item.remoteId);
-            if (modInfo && modInfo.latestFiles && modInfo.latestFiles.length > 0) {
-              const latest = modInfo.latestFiles[0];
-              const curVer = item.manifest.version;
-              const newVer = latest.displayName || latest.fileName;
-              if (item.curseforgeFileId && latest.id > item.curseforgeFileId) {
-                item.updateAvailable = true;
-                item.latestRemoteFile = latest;
-              } else if (curVer && curVer !== 'Unknown' && newVer && !newVer.includes(curVer)) {
-                item.updateAvailable = true;
-                item.latestRemoteFile = latest;
+            if (modInfo) {
+              if (modInfo.logo?.thumbnailUrl && !item.iconUrl) {
+                item.iconUrl = modInfo.logo.thumbnailUrl;
+                if (!meta.installedMods[item.fileName]) meta.installedMods[item.fileName] = {};
+                meta.installedMods[item.fileName].iconUrl = item.iconUrl;
+                metaChanged = true;
+              }
+              if (modInfo.latestFiles && modInfo.latestFiles.length > 0 && !item.updateAvailable) {
+                const latest = modInfo.latestFiles[0];
+                const curVer = item.manifest.version;
+                const newVer = latest.displayName || latest.fileName;
+                if (item.curseforgeFileId && latest.id > item.curseforgeFileId) {
+                  item.updateAvailable = true;
+                  item.latestRemoteFile = latest;
+                } else if (curVer && curVer !== 'Unknown' && newVer && !newVer.includes(curVer)) {
+                  item.updateAvailable = true;
+                  item.latestRemoteFile = latest;
+                }
               }
             }
           } catch {
             // Ignore single mod update check error
           }
         }
+      }
+      if (metaChanged) {
+        await this.saveMetadata(meta).catch(() => {});
       }
     }
 
@@ -341,6 +354,7 @@ class ModManager {
       fileId: fileObj.id,
       name: modObj.name,
       version: fileObj.displayName || fileObj.fileName,
+      iconUrl: modObj.logo?.thumbnailUrl || modObj.logo?.url || null,
       installedAt: Date.now(),
     };
     await this.saveMetadata(meta);
@@ -404,6 +418,7 @@ class ModManager {
         remoteId: `${res.namespace}/${res.name}`,
         name: pkgInfo.name,
         version: res.version,
+        iconUrl: pkgInfo.icon_url || null,
         installedAt: Date.now(),
       };
     }

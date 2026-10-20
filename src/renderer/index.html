@@ -41,6 +41,7 @@
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
     <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></symbol>
     <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>
   </svg>
 
   <div class="app" id="app">
@@ -82,9 +83,9 @@
           <svg class="ic"><use href="#i-settings"/></svg><span>Settings</span>
         </button>
         <button id="sidebar-account" class="account-chip" title="Hytale account">
-          <span class="avatar"><svg class="ic"><use href="#i-user"/></svg></span>
+          <span id="sidebar-account-avatar" class="avatar"><svg class="ic"><use href="#i-user"/></svg></span>
           <span class="account-text">
-            <span class="account-title">Hytale account</span>
+            <span id="sidebar-account-name" class="account-title truncate">Hytale account</span>
             <span class="account-status"><span id="sidebar-account-dot" class="dot dot-muted"></span><span id="sidebar-account-text">Checking…</span></span>
           </span>
         </button>
@@ -195,7 +196,7 @@
 
               <div class="card">
                 <div class="card-head">
-                  <h2 class="card-title">Hytale account</h2>
+                  <h2 id="dash-auth-user-title" class="card-title truncate">Hytale account</h2>
                   <span id="dash-auth-status-badge" class="tag">Checking…</span>
                 </div>
                 <p id="dash-auth-desc" class="card-text">Sign in to download server updates directly from Hytale.</p>
@@ -262,8 +263,20 @@
                 <button data-value="disabled">Disabled <span class="seg-count" data-count="disabled"></span></button>
                 <button data-value="updates">Updates <span class="seg-count" data-count="updates"></span></button>
               </div>
+              <select id="mods-source-filter" class="select" aria-label="Source">
+                <option value="all">All sources</option>
+                <option value="curseforge">CurseForge</option>
+                <option value="thunderstore">Thunderstore</option>
+                <option value="local">Local</option>
+              </select>
+              <select id="mods-sort-select" class="select" aria-label="Sort">
+                <option value="name-asc">Name (A–Z)</option>
+                <option value="name-desc">Name (Z–A)</option>
+                <option value="updated-desc">Recently updated</option>
+                <option value="size-desc">File size</option>
+              </select>
               <div class="toolbar-end">
-                <button id="btn-update-all-mods" class="btn btn-primary btn-sm hidden">
+                <button id="btn-update-all-mods" class="btn btn-update btn-sm hidden">
                   <svg class="ic"><use href="#i-update"/></svg><span>Update all</span>
                 </button>
                 <button id="btn-refresh-installed-mods" class="icon-btn" title="Check for updates" aria-label="Check for updates">
@@ -272,6 +285,28 @@
                 <button id="btn-open-mods-folder" class="icon-btn" title="Open mods folder" aria-label="Open mods folder">
                   <svg class="ic"><use href="#i-folder"/></svg>
                 </button>
+              </div>
+            </div>
+
+            <!-- Batch actions bar for multi-selection -->
+            <div id="mods-batch-bar" class="batch-bar hidden">
+              <div class="batch-bar-left">
+                <label class="batch-checkbox-wrap">
+                  <input type="checkbox" id="mods-select-all">
+                  <span id="mods-selected-count">0 selected</span>
+                </label>
+              </div>
+              <div class="batch-bar-actions">
+                <button id="btn-batch-enable" class="btn btn-secondary btn-sm">
+                  <svg class="ic"><use href="#i-check"/></svg><span>Enable</span>
+                </button>
+                <button id="btn-batch-disable" class="btn btn-secondary btn-sm">
+                  <svg class="ic"><use href="#i-x"/></svg><span>Disable</span>
+                </button>
+                <button id="btn-batch-delete" class="btn btn-danger btn-sm">
+                  <svg class="ic"><use href="#i-trash"/></svg><span>Delete</span>
+                </button>
+                <button id="btn-batch-clear" class="btn btn-ghost btn-sm">Clear</button>
               </div>
             </div>
 
@@ -291,21 +326,42 @@
                 <svg class="ic"><use href="#i-search"/></svg>
                 <input type="search" id="browse-search-input" placeholder="Search mods" data-page-search>
               </label>
-              <select id="cf-category-select" class="select" aria-label="Category">
-                <option value="">All categories</option>
-              </select>
-              <select id="cf-sort-select" class="select" aria-label="Sort">
-                <option value="2">Popular</option>
-                <option value="5">Most downloaded</option>
-                <option value="3">Recently updated</option>
-                <option value="1">Featured</option>
-                <option value="4">Name</option>
-              </select>
-              <select id="ts-sort-select" class="select hidden" aria-label="Sort">
+              <button id="btn-toggle-filters" class="btn btn-secondary btn-sm" title="Advanced Filters">
+                <svg class="ic"><use href="#i-filter"/></svg><span>Filters</span>
+                <span id="filters-badge" class="tag tag-info hidden">0</span>
+              </button>
+              <select id="browse-sort-select" class="select" aria-label="Sort">
+                <option value="popular">Popular</option>
                 <option value="downloads">Most downloaded</option>
                 <option value="updated">Recently updated</option>
                 <option value="name">Name</option>
               </select>
+            </div>
+
+            <!-- Advanced multi-parameter filters panel -->
+            <div id="browse-advanced-filters" class="filters-panel hidden">
+              <div class="filters-grid">
+                <div class="filters-group">
+                  <div class="filters-group-head">
+                    <span class="filters-label">Categories (click to multi-select)</span>
+                    <button id="btn-clear-categories" class="link-btn text-xs">Clear</button>
+                  </div>
+                  <div id="cf-categories-chips" class="chip-grid"></div>
+                </div>
+                <div class="filters-col">
+                  <label class="filters-field">
+                    <span class="filters-label">Last updated</span>
+                    <select id="browse-updated-filter" class="select">
+                      <option value="all">Any time</option>
+                      <option value="7d">Past 7 days</option>
+                      <option value="30d">Past 30 days</option>
+                      <option value="90d">Past 3 months</option>
+                      <option value="1y">Past year</option>
+                    </select>
+                  </label>
+                  <button id="btn-reset-browse-filters" class="btn btn-ghost btn-sm">Reset all filters</button>
+                </div>
+              </div>
             </div>
 
             <div id="browse-cf">
@@ -399,24 +455,48 @@
             </div>
 
             <div class="settings-group">
-              <h2 class="settings-title">App</h2>
+              <h2 class="settings-title">App & Window Behavior</h2>
               <div class="settings-card">
                 <div class="setting">
                   <div class="setting-text">
-                    <div class="setting-label">Close to tray</div>
-                    <div class="setting-desc">Keep running in the background with near-zero CPU use.</div>
+                    <div class="setting-label">When closing window</div>
+                    <div class="setting-desc">Choose whether clicking X keeps the app in the tray or exits completely.</div>
                   </div>
                   <div class="setting-control">
-                    <label class="switch"><input type="checkbox" id="settings-close-to-tray"><span class="switch-track"></span></label>
+                    <div class="segmented segmented-sm" id="settings-close-action" role="radiogroup" aria-label="When closing window">
+                      <button data-value="tray" class="active" role="radio">Minimize to tray</button>
+                      <button data-value="exit" role="radio">Exit application</button>
+                    </div>
                   </div>
                 </div>
                 <div class="setting">
                   <div class="setting-text">
-                    <div class="setting-label">Launch at login</div>
-                    <div class="setting-desc">Start minimized in the tray when you sign in to Windows.</div>
+                    <div class="setting-label">Launch at Windows startup</div>
+                    <div class="setting-desc">Automatically launch this manager when you sign in to Windows.</div>
                   </div>
                   <div class="setting-control">
                     <label class="switch"><input type="checkbox" id="settings-login-item"><span class="switch-track"></span></label>
+                  </div>
+                </div>
+                <div class="setting" id="setting-row-startup-behavior">
+                  <div class="setting-text">
+                    <div class="setting-label">Startup appearance</div>
+                    <div class="setting-desc">Start quietly in the system tray or open the window.</div>
+                  </div>
+                  <div class="setting-control">
+                    <div class="segmented segmented-sm" id="settings-startup-behavior" role="radiogroup" aria-label="Startup appearance">
+                      <button data-value="tray" class="active" role="radio">System tray</button>
+                      <button data-value="window" role="radio">Open window</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Auto-start server</div>
+                    <div class="setting-desc">Automatically start the Hytale server whenever this app launches.</div>
+                  </div>
+                  <div class="setting-control">
+                    <label class="switch"><input type="checkbox" id="settings-auto-start-server"><span class="switch-track"></span></label>
                   </div>
                 </div>
               </div>

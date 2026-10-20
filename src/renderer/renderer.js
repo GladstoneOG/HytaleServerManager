@@ -14,6 +14,8 @@ const toastContainer = $('toast-container');
 // Sidebar & Topbar
 const navModsCount = $('nav-mods-count');
 const sidebarAccount = $('sidebar-account');
+const sidebarAccountAvatar = $('sidebar-account-avatar');
+const sidebarAccountName = $('sidebar-account-name');
 const sidebarAccountDot = $('sidebar-account-dot');
 const sidebarAccountText = $('sidebar-account-text');
 const topbarStatus = $('topbar-status');
@@ -45,6 +47,7 @@ const dashInstalledVer = $('dash-installed-ver');
 const dashUpstreamVer = $('dash-upstream-ver');
 const dashActiveProfile = $('dash-active-profile');
 const dashServerDir = $('dash-server-dir');
+const dashAuthUserTitle = $('dash-auth-user-title');
 const dashAuthBadge = $('dash-auth-status-badge');
 const dashAuthDesc = $('dash-auth-desc');
 const btnDashLoginHytale = $('btn-dash-login-hytale');
@@ -63,17 +66,33 @@ const consoleInput = $('console-input');
 // Library
 const modsSearchInput = $('mods-search-input');
 const modsFilter = $('mods-filter');
+const modsSourceFilter = $('mods-source-filter');
+const modsSortSelect = $('mods-sort-select');
 const btnUpdateAllMods = $('btn-update-all-mods');
 const btnRefreshInstalledMods = $('btn-refresh-installed-mods');
 const btnOpenModsFolder = $('btn-open-mods-folder');
 const installedModsList = $('installed-mods-list');
 
+// Multi-selection batch bar
+const modsBatchBar = $('mods-batch-bar');
+const modsSelectAll = $('mods-select-all');
+const modsSelectedCount = $('mods-selected-count');
+const btnBatchEnable = $('btn-batch-enable');
+const btnBatchDisable = $('btn-batch-disable');
+const btnBatchDelete = $('btn-batch-delete');
+const btnBatchClear = $('btn-batch-clear');
+
 // Browse (Unified CurseForge + Thunderstore)
 const browseSource = $('browse-source');
 const browseSearchInput = $('browse-search-input');
-const cfCategorySelect = $('cf-category-select');
-const cfSortSelect = $('cf-sort-select');
-const tsSortSelect = $('ts-sort-select');
+const btnToggleFilters = $('btn-toggle-filters');
+const filtersBadge = $('filters-badge');
+const browseSortSelect = $('browse-sort-select');
+const browseAdvancedFilters = $('browse-advanced-filters');
+const cfCategoriesChips = $('cf-categories-chips');
+const btnClearCategories = $('btn-clear-categories');
+const browseUpdatedFilter = $('browse-updated-filter');
+const btnResetBrowseFilters = $('btn-reset-browse-filters');
 const browseCf = $('browse-cf');
 const cfResultsGrid = $('cf-results-grid');
 const cfPrevPage = $('cf-prev-page');
@@ -94,8 +113,11 @@ const btnBrowseServerDir = $('btn-browse-server-dir');
 const settingsMaxRam = $('settings-max-ram');
 const settingsLaunchMode = $('settings-launch-mode');
 const settingsPatchline = $('settings-patchline');
-const settingsCloseToTray = $('settings-close-to-tray');
+const settingsCloseAction = $('settings-close-action');
 const settingsLoginItem = $('settings-login-item');
+const settingRowStartupBehavior = $('setting-row-startup-behavior');
+const settingsStartupBehavior = $('settings-startup-behavior');
+const settingsAutoStartServer = $('settings-auto-start-server');
 const settingsAccountDesc = $('settings-account-desc');
 const btnTriggerDeviceLogin = $('btn-trigger-device-login');
 const settingsCfApiKey = $('settings-cf-api-key');
@@ -153,11 +175,19 @@ let appConfig = null;
 let currentTab = 'overview';
 let currentInstalledMods = [];
 let currentModsFilter = 'all';
+let currentModsSourceFilter = 'all';
+let currentModsSort = 'name-asc';
+const selectedModFiles = new Set();
+
 let currentBrowseSource = 'curseforge';
 let cfPageIndex = 0;
 const CF_PAGE_SIZE = 18;
 let cfLoadedOnce = false;
 let tsLoadedOnce = false;
+let rawBrowseModsCache = [];
+const selectedBrowseCategories = new Set();
+let browseCategoriesList = [];
+
 let activeDeviceAuth = null;
 let commandHistory = [];
 let historyIndex = -1;
@@ -293,6 +323,7 @@ const TAB_TITLES = {
 function switchTab(tabId) {
   if (!TAB_TITLES[tabId]) return;
   currentTab = tabId;
+  appEl.dataset.activeTab = tabId;
 
   navButtons.forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tab === tabId);
@@ -301,6 +332,12 @@ function switchTab(tabId) {
     pane.classList.toggle('active', pane.id === `tab-${tabId}`);
   });
   pageTitle.textContent = TAB_TITLES[tabId];
+
+  // FIX 2: Hide duplicate topbar Start/Stop button on Overview tab
+  if (quickServerBtn) {
+    const isOverview = tabId === 'overview';
+    quickServerBtn.classList.toggle('is-overview-hidden', isOverview);
+  }
 
   if (tabId === 'library') {
     loadInstalledMods(false);
@@ -371,8 +408,12 @@ async function init() {
     appConfig = await window.api.getConfig();
     applyConfigToUI();
 
-    const loginItemEnabled = await window.api.getLoginItem();
-    settingsLoginItem.checked = Boolean(loginItemEnabled);
+    const loginItemInfo = await window.api.getLoginItem();
+    settingsLoginItem.checked = Boolean(loginItemInfo?.openAtLogin);
+    settingRowStartupBehavior?.classList.toggle('hidden', !settingsLoginItem.checked);
+
+    // Initial tab setup
+    switchTab('overview');
 
     // Load existing console log history
     const logs = await window.api.getServerLogs();
@@ -405,7 +446,19 @@ function applyConfigToUI() {
   if (appConfig.patchline) settingsPatchline.value = appConfig.patchline;
   if (appConfig.maxRam) settingsMaxRam.value = appConfig.maxRam;
   if (appConfig.cfApiKey) settingsCfApiKey.value = appConfig.cfApiKey;
-  if (typeof appConfig.closeToTray === 'boolean') settingsCloseToTray.checked = appConfig.closeToTray;
+
+  // Window close action (tray vs exit)
+  const closeAction = appConfig.closeToTray === false ? 'exit' : 'tray';
+  setSegmentedValue(settingsCloseAction, closeAction);
+
+  // Startup appearance
+  const startupBehavior = appConfig.startupBehavior === 'window' ? 'window' : 'tray';
+  setSegmentedValue(settingsStartupBehavior, startupBehavior);
+
+  // Auto-start server
+  if (settingsAutoStartServer) {
+    settingsAutoStartServer.checked = Boolean(appConfig.autoStartServer);
+  }
 
   const mode = appConfig.launchMode || 'integrated';
   setSegmentedValue(consoleLaunchMode, mode);
@@ -419,7 +472,7 @@ async function saveConfigPatch(patch) {
 }
 
 // ============================================================================
-// Hytale Account & Device Code Sign-In
+// Hytale Account & Device Code Sign-In (Display Account Name)
 // ============================================================================
 async function refreshAccountStatus() {
   try {
@@ -427,29 +480,52 @@ async function refreshAccountStatus() {
 
     if (status.authenticated && !status.isExpired) {
       sidebarAccountDot.className = 'dot dot-ok';
-      sidebarAccountText.textContent = 'Connected';
+      const displayName = status.username || (status.email ? status.email.split('@')[0] : 'Connected User');
+      const emailText = status.email || 'Connected';
+
+      // FIX 1: Show actual Hytale account name in sidebar and overview
+      sidebarAccountName.textContent = displayName;
+      sidebarAccountText.textContent = emailText;
+      sidebarAccount.title = `${displayName} (${emailText})`;
+      sidebarAccountAvatar.textContent = displayName.charAt(0).toUpperCase();
+
+      dashAuthUserTitle.textContent = displayName;
       dashAuthBadge.className = 'tag tag-success';
       dashAuthBadge.textContent = 'Connected';
-      dashAuthDesc.textContent = `Signed in (${status.branch || 'release'} channel). Official server updates are enabled.`;
+      dashAuthDesc.textContent = status.email
+        ? `Connected as ${status.email} (${status.branch || 'release'} channel). Official server updates are enabled.`
+        : `Signed in on ${status.branch || 'release'} channel. Official server updates are enabled.`;
       btnDashLoginHytale.querySelector('span').textContent = 'Reconnect';
-      settingsAccountDesc.textContent = `Connected · credentials saved in server folder.`;
+
+      settingsAccountDesc.textContent = `Connected as ${displayName} (${emailText}). Credentials saved in server folder.`;
       btnTriggerDeviceLogin.textContent = 'Reconnect';
     } else if (status.authenticated && status.isExpired) {
       sidebarAccountDot.className = 'dot dot-warn';
+      const displayName = status.username || 'Session expired';
+      sidebarAccountName.textContent = displayName;
       sidebarAccountText.textContent = 'Session expired';
+      sidebarAccountAvatar.textContent = '⚠';
+
+      dashAuthUserTitle.textContent = displayName;
       dashAuthBadge.className = 'tag tag-warning';
       dashAuthBadge.textContent = 'Expired';
       dashAuthDesc.textContent = 'Your session expired. Sign in again to check for and install server updates.';
       btnDashLoginHytale.querySelector('span').textContent = 'Sign in';
+
       settingsAccountDesc.textContent = 'Session expired. Sign in again to refresh.';
       btnTriggerDeviceLogin.textContent = 'Sign in';
     } else {
       sidebarAccountDot.className = 'dot dot-muted';
+      sidebarAccountName.textContent = 'Hytale account';
       sidebarAccountText.textContent = 'Not signed in';
+      sidebarAccountAvatar.innerHTML = '<svg class="ic"><use href="#i-user"/></svg>';
+
+      dashAuthUserTitle.textContent = 'Hytale account';
       dashAuthBadge.className = 'tag';
       dashAuthBadge.textContent = 'Not signed in';
       dashAuthDesc.textContent = 'Sign in to download server updates directly from Hytale.';
       btnDashLoginHytale.querySelector('span').textContent = 'Sign in';
+
       settingsAccountDesc.textContent = 'Used to download official server updates.';
       btnTriggerDeviceLogin.textContent = 'Sign in';
     }
@@ -536,6 +612,8 @@ async function checkServerVersion() {
     if (res.installed && res.updateAvailable && res.latestVersion) {
       serverUpdateBanner.classList.remove('hidden');
       targetVersionTag.textContent = res.latestVersion;
+      // FIX 3: Update button styled with crisp blue .btn-update
+      btnUpdateServerNow.className = 'btn btn-update btn-sm';
     } else {
       serverUpdateBanner.classList.add('hidden');
     }
@@ -715,7 +793,7 @@ wizardBtnStart.addEventListener('click', async () => {
 });
 
 // ============================================================================
-// Installed Mods (Library)
+// Installed Mods (Library: Thumbnails, Multi-Selection & Sorting)
 // ============================================================================
 async function loadInstalledMods(checkRemoteUpdates = true) {
   try {
@@ -745,6 +823,7 @@ async function loadInstalledMods(checkRemoteUpdates = true) {
 
     if (updates > 0) {
       btnUpdateAllMods.classList.remove('hidden');
+      btnUpdateAllMods.className = 'btn btn-update btn-sm';
       btnUpdateAllMods.querySelector('span').textContent = `Update all (${updates})`;
     } else {
       btnUpdateAllMods.classList.add('hidden');
@@ -756,27 +835,64 @@ async function loadInstalledMods(checkRemoteUpdates = true) {
   }
 }
 
+function updateBatchBarState(filteredMods) {
+  const count = selectedModFiles.size;
+  if (count > 0) {
+    modsBatchBar.classList.remove('hidden');
+    modsSelectedCount.textContent = `${count} selected`;
+    if (filteredMods && filteredMods.length > 0) {
+      modsSelectAll.checked = filteredMods.every((m) => selectedModFiles.has(m.fileName));
+    }
+  } else {
+    modsBatchBar.classList.add('hidden');
+    modsSelectAll.checked = false;
+  }
+}
+
 function renderInstalledModsList() {
   const query = modsSearchInput.value.trim().toLowerCase();
 
-  const filtered = currentInstalledMods.filter((m) => {
+  // Filter by search, status, and source
+  let filtered = currentInstalledMods.filter((m) => {
     if (query) {
       const nameMatch = (m.manifest?.name || '').toLowerCase().includes(query);
       const fileMatch = (m.fileName || '').toLowerCase().includes(query);
       const descMatch = (m.manifest?.description || '').toLowerCase().includes(query);
       if (!nameMatch && !fileMatch && !descMatch) return false;
     }
-    if (currentModsFilter === 'enabled') return m.isEnabled;
-    if (currentModsFilter === 'disabled') return !m.isEnabled;
-    if (currentModsFilter === 'updates') return m.updateAvailable;
+    if (currentModsFilter === 'enabled' && !m.isEnabled) return false;
+    if (currentModsFilter === 'disabled' && m.isEnabled) return false;
+    if (currentModsFilter === 'updates' && !m.updateAvailable) return false;
+
+    if (currentModsSourceFilter !== 'all' && m.source !== currentModsSourceFilter) return false;
+
     return true;
   });
+
+  // Sort
+  filtered.sort((a, b) => {
+    if (currentModsSort === 'name-asc') {
+      return (a.manifest?.name || a.fileName).localeCompare(b.manifest?.name || b.fileName);
+    }
+    if (currentModsSort === 'name-desc') {
+      return (b.manifest?.name || b.fileName).localeCompare(a.manifest?.name || a.fileName);
+    }
+    if (currentModsSort === 'updated-desc') {
+      return (b.lastModified || 0) - (a.lastModified || 0);
+    }
+    if (currentModsSort === 'size-desc') {
+      return (b.size || 0) - (a.size || 0);
+    }
+    return 0;
+  });
+
+  updateBatchBarState(filtered);
 
   if (filtered.length === 0) {
     const emptyMsg =
       currentInstalledMods.length === 0
         ? 'No mods installed yet. Browse CurseForge or Thunderstore to add mods.'
-        : 'No mods match your current filter.';
+        : 'No mods match your current filter parameters.';
     installedModsList.innerHTML = `
       <div class="empty">
         <div class="empty-title">${currentInstalledMods.length === 0 ? 'Your library is empty' : 'No matches'}</div>
@@ -797,12 +913,26 @@ function renderInstalledModsList() {
         ? '<span class="tag tag-warning">CurseForge</span>'
         : m.source === 'thunderstore'
         ? '<span class="tag tag-info">Thunderstore</span>'
-        : '';
+        : '<span class="tag">Local</span>';
 
     const updateTag = m.updateAvailable ? '<span class="tag tag-success">Update available</span>' : '';
     const authors = (m.manifest?.authors || []).map((a) => (typeof a === 'string' ? a : a.Name)).filter(Boolean).join(', ');
 
+    // FIX 4: Mod thumbnail avatar
+    const initial = (m.manifest?.name || m.fileName || 'M').charAt(0).toUpperCase();
+    const avatarHtml = m.iconUrl
+      ? `<img src="${escapeHtml(m.iconUrl)}" alt="" loading="lazy">`
+      : escapeHtml(initial);
+
+    const isSelected = selectedModFiles.has(m.fileName);
+
     row.innerHTML = `
+      <div class="mod-select-wrap">
+        <input type="checkbox" class="mod-select-cb" data-file="${escapeHtml(m.fileName)}" ${isSelected ? 'checked' : ''} title="Select mod">
+      </div>
+      <div class="mod-row-avatar">
+        ${avatarHtml}
+      </div>
       <label class="switch" title="${m.isEnabled ? 'Enabled' : 'Disabled'}">
         <input type="checkbox" class="mod-toggle-cb" ${m.isEnabled ? 'checked' : ''}>
         <span class="switch-track"></span>
@@ -818,13 +948,14 @@ function renderInstalledModsList() {
         <div class="mod-row-meta">
           <span class="mono">${escapeHtml(m.fileName)}</span>
           <span>${Math.max(1, Math.round((m.size || 0) / 1024))} KB</span>
+          ${m.lastModified ? `<span>Updated ${new Date(m.lastModified).toLocaleDateString()}</span>` : ''}
           ${authors ? `<span>by ${escapeHtml(authors)}</span>` : ''}
         </div>
       </div>
       <div class="mod-row-actions">
         ${
           m.updateAvailable
-            ? `<button class="btn btn-primary btn-sm btn-update-mod"><svg class="ic"><use href="#i-update"/></svg><span>Update</span></button>`
+            ? `<button class="btn btn-update btn-sm btn-update-mod"><svg class="ic"><use href="#i-update"/></svg><span>Update</span></button>`
             : ''
         }
         <button class="icon-btn danger btn-delete-mod" title="Remove mod" aria-label="Remove mod">
@@ -833,6 +964,17 @@ function renderInstalledModsList() {
       </div>
     `;
 
+    // Selection checkbox
+    row.querySelector('.mod-select-cb').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        selectedModFiles.add(m.fileName);
+      } else {
+        selectedModFiles.delete(m.fileName);
+      }
+      updateBatchBarState(filtered);
+    });
+
+    // Toggle mod
     row.querySelector('.mod-toggle-cb').addEventListener('change', async (e) => {
       const enable = e.target.checked;
       try {
@@ -844,6 +986,7 @@ function renderInstalledModsList() {
       }
     });
 
+    // Update single mod
     const updateBtn = row.querySelector('.btn-update-mod');
     if (updateBtn) {
       updateBtn.addEventListener('click', async () => {
@@ -867,6 +1010,7 @@ function renderInstalledModsList() {
       });
     }
 
+    // Delete single mod
     row.querySelector('.btn-delete-mod').addEventListener('click', async () => {
       const ok = await confirmDialog({
         title: `Remove ${m.manifest?.name || m.fileName}?`,
@@ -877,6 +1021,7 @@ function renderInstalledModsList() {
       if (!ok) return;
       try {
         await window.api.deleteMod(m.fileName, false);
+        selectedModFiles.delete(m.fileName);
         showToast(`Removed ${m.manifest?.name || m.fileName}`, 'info');
         await loadInstalledMods(false);
       } catch (err) {
@@ -898,6 +1043,82 @@ modsFilter.querySelectorAll('button[data-value]').forEach((btn) => {
     setSegmentedValue(modsFilter, currentModsFilter);
     renderInstalledModsList();
   });
+});
+
+modsSourceFilter?.addEventListener('change', (e) => {
+  currentModsSourceFilter = e.target.value;
+  renderInstalledModsList();
+});
+
+modsSortSelect?.addEventListener('change', (e) => {
+  currentModsSort = e.target.value;
+  renderInstalledModsList();
+});
+
+// Select All checkbox
+modsSelectAll.addEventListener('change', (e) => {
+  const query = modsSearchInput.value.trim().toLowerCase();
+  const filtered = currentInstalledMods.filter((m) => {
+    if (query && !(m.manifest?.name || '').toLowerCase().includes(query)) return false;
+    if (currentModsFilter === 'enabled' && !m.isEnabled) return false;
+    if (currentModsFilter === 'disabled' && m.isEnabled) return false;
+    if (currentModsFilter === 'updates' && !m.updateAvailable) return false;
+    if (currentModsSourceFilter !== 'all' && m.source !== currentModsSourceFilter) return false;
+    return true;
+  });
+
+  if (e.target.checked) {
+    filtered.forEach((m) => selectedModFiles.add(m.fileName));
+  } else {
+    selectedModFiles.clear();
+  }
+  renderInstalledModsList();
+});
+
+btnBatchClear.addEventListener('click', () => {
+  selectedModFiles.clear();
+  renderInstalledModsList();
+});
+
+btnBatchEnable.addEventListener('click', async () => {
+  const count = selectedModFiles.size;
+  if (count === 0) return;
+  for (const fn of selectedModFiles) {
+    await window.api.setModEnabled(fn, true).catch(() => {});
+  }
+  showToast(`Enabled ${count} mod(s)`, 'success');
+  selectedModFiles.clear();
+  await loadInstalledMods(false);
+});
+
+btnBatchDisable.addEventListener('click', async () => {
+  const count = selectedModFiles.size;
+  if (count === 0) return;
+  for (const fn of selectedModFiles) {
+    await window.api.setModEnabled(fn, false).catch(() => {});
+  }
+  showToast(`Disabled ${count} mod(s)`, 'info');
+  selectedModFiles.clear();
+  await loadInstalledMods(false);
+});
+
+btnBatchDelete.addEventListener('click', async () => {
+  const count = selectedModFiles.size;
+  if (count === 0) return;
+  const ok = await confirmDialog({
+    title: `Delete ${count} selected mod(s)?`,
+    message: 'This will permanently remove the selected mod jar files from your server.',
+    confirmLabel: `Delete ${count} mods`,
+    danger: true,
+  });
+  if (!ok) return;
+
+  for (const fn of selectedModFiles) {
+    await window.api.deleteMod(fn, false).catch(() => {});
+  }
+  showToast(`Deleted ${count} mod(s)`, 'info');
+  selectedModFiles.clear();
+  await loadInstalledMods(false);
 });
 
 btnRefreshInstalledMods.addEventListener('click', async () => {
@@ -927,7 +1148,7 @@ btnUpdateAllMods.addEventListener('click', async () => {
 });
 
 // ============================================================================
-// Unified Browse (CurseForge + Thunderstore)
+// Unified Browse (Advanced Filters & Sorting)
 // ============================================================================
 function setBrowseSource(source) {
   currentBrowseSource = source;
@@ -935,11 +1156,7 @@ function setBrowseSource(source) {
 
   const isCf = source === 'curseforge';
   browseCf.classList.toggle('hidden', !isCf);
-  cfCategorySelect.classList.toggle('hidden', !isCf);
-  cfSortSelect.classList.toggle('hidden', !isCf);
-
   browseTs.classList.toggle('hidden', isCf);
-  tsSortSelect.classList.toggle('hidden', isCf);
 
   if (isCf) {
     if (!cfLoadedOnce) loadCurseForgeMods();
@@ -950,6 +1167,55 @@ function setBrowseSource(source) {
 
 browseSource.querySelectorAll('button[data-value]').forEach((btn) => {
   btn.addEventListener('click', () => setBrowseSource(btn.dataset.value));
+});
+
+// Toggle Advanced Filters Panel
+btnToggleFilters.addEventListener('click', () => {
+  browseAdvancedFilters.classList.toggle('hidden');
+});
+
+btnClearCategories.addEventListener('click', () => {
+  selectedBrowseCategories.clear();
+  renderCategoryChips();
+  updateFiltersBadge();
+  applyBrowseFilters();
+});
+
+btnResetBrowseFilters.addEventListener('click', () => {
+  selectedBrowseCategories.clear();
+  browseUpdatedFilter.value = 'all';
+  browseSortSelect.value = 'popular';
+  renderCategoryChips();
+  updateFiltersBadge();
+  cfPageIndex = 0;
+  if (currentBrowseSource === 'curseforge') {
+    loadCurseForgeMods();
+  } else {
+    loadThunderstoreMods();
+  }
+});
+
+function updateFiltersBadge() {
+  let count = selectedBrowseCategories.size;
+  if (browseUpdatedFilter.value !== 'all') count++;
+  if (browseSortSelect.value !== 'popular') count++;
+
+  if (count > 0) {
+    filtersBadge.classList.remove('hidden');
+    filtersBadge.textContent = count;
+  } else {
+    filtersBadge.classList.add('hidden');
+  }
+}
+
+browseUpdatedFilter.addEventListener('change', () => {
+  updateFiltersBadge();
+  applyBrowseFilters();
+});
+
+browseSortSelect.addEventListener('change', () => {
+  updateFiltersBadge();
+  applyBrowseFilters();
 });
 
 const triggerBrowseSearch = debounce(() => {
@@ -966,18 +1232,46 @@ browseSearchInput.addEventListener('input', triggerBrowseSearch);
 async function loadCfCategories() {
   try {
     const cats = await window.api.getCfCategories();
-    cfCategorySelect.innerHTML = '<option value="">All categories</option>';
-    (cats || []).forEach((c) => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name;
-      cfCategorySelect.appendChild(opt);
-    });
+    browseCategoriesList = cats || [];
+    renderCategoryChips();
   } catch {}
+}
+
+function renderCategoryChips() {
+  if (!cfCategoriesChips) return;
+  cfCategoriesChips.innerHTML = '';
+  browseCategoriesList.forEach((c) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    const isAct = selectedBrowseCategories.has(c.id);
+    chip.className = `filter-chip${isAct ? ' active' : ''}`;
+    chip.textContent = c.name;
+    chip.addEventListener('click', () => {
+      if (selectedBrowseCategories.has(c.id)) {
+        selectedBrowseCategories.delete(c.id);
+      } else {
+        selectedBrowseCategories.add(c.id);
+      }
+      chip.classList.toggle('active', selectedBrowseCategories.has(c.id));
+      updateFiltersBadge();
+      applyBrowseFilters();
+    });
+    cfCategoriesChips.appendChild(chip);
+  });
 }
 
 function renderSkeletonCards(container, count = 6) {
   container.innerHTML = Array.from({ length: count }, () => '<div class="skeleton-card"></div>').join('');
+}
+
+function getSortFieldForCurseForge(val) {
+  switch (val) {
+    case 'popular': return 2; // Popularity
+    case 'downloads': return 5; // Total downloads
+    case 'updated': return 3; // Recently updated
+    case 'name': return 4; // Name
+    default: return 2;
+  }
 }
 
 async function loadCurseForgeMods() {
@@ -985,8 +1279,12 @@ async function loadCurseForgeMods() {
     renderSkeletonCards(cfResultsGrid, 6);
 
     const searchFilter = browseSearchInput.value.trim();
-    const sortField = parseInt(cfSortSelect.value, 10);
-    const categoryId = cfCategorySelect.value ? parseInt(cfCategorySelect.value, 10) : null;
+    const sortVal = browseSortSelect.value;
+    const sortField = getSortFieldForCurseForge(sortVal);
+
+    // If a single category is selected in multi-select, pass it to upstream API for indexing
+    const catArray = Array.from(selectedBrowseCategories);
+    const categoryId = catArray.length === 1 ? catArray[0] : null;
 
     const res = await window.api.searchCurseForge({
       searchFilter,
@@ -997,7 +1295,7 @@ async function loadCurseForgeMods() {
     });
 
     cfLoadedOnce = true;
-    const mods = res.data || [];
+    rawBrowseModsCache = res.data || [];
     const total = res.pagination?.totalCount || 0;
     const maxPages = Math.max(1, Math.ceil(total / CF_PAGE_SIZE));
 
@@ -1005,113 +1303,150 @@ async function loadCurseForgeMods() {
     cfPrevPage.disabled = cfPageIndex === 0;
     cfNextPage.disabled = cfPageIndex >= maxPages - 1;
 
-    if (mods.length === 0) {
-      cfResultsGrid.innerHTML = `
-        <div class="empty">
-          <div class="empty-title">No mods found</div>
-          <div class="empty-sub">Try a different search term or category.</div>
-        </div>`;
-      return;
-    }
-
-    cfResultsGrid.innerHTML = '';
-    const frag = document.createDocumentFragment();
-
-    mods.forEach((mod) => {
-      const card = document.createElement('div');
-      card.className = 'mod-card is-clickable';
-
-      const initial = (mod.name || 'M').charAt(0).toUpperCase();
-      const avatarHtml = mod.logo?.thumbnailUrl
-        ? `<img src="${escapeHtml(mod.logo.thumbnailUrl)}" alt="" loading="lazy">`
-        : escapeHtml(initial);
-
-      const authorName = (mod.authors || []).map((a) => a.name).join(', ') || 'Unknown';
-      const downloads = formatNumber(mod.downloadCount);
-      const latestFile = mod.latestFiles?.[0] || null;
-
-      const installedMatch = currentInstalledMods.find(
-        (m) => m.remoteId === mod.id || (m.manifest?.name || '').toLowerCase() === (mod.name || '').toLowerCase()
-      );
-
-      let btnLabel = 'Install';
-      let btnClass = 'btn-primary';
-      const canInstall = !installedMatch || installedMatch.updateAvailable;
-      if (installedMatch) {
-        btnLabel = installedMatch.updateAvailable ? 'Update' : 'Installed';
-        btnClass = installedMatch.updateAvailable ? 'btn-primary' : 'btn-ghost';
-      }
-
-      card.innerHTML = `
-        <div class="mod-card-head">
-          <div class="mod-avatar">${avatarHtml}</div>
-          <div class="mod-card-titles">
-            <div class="mod-card-name" title="${escapeHtml(mod.name)}">${escapeHtml(mod.name)}</div>
-            <div class="mod-card-by">by ${escapeHtml(authorName)}</div>
-          </div>
-        </div>
-        <div class="mod-card-desc">${escapeHtml(mod.summary || 'No description provided.')}</div>
-        <div class="mod-card-foot">
-          <span class="mod-card-stat">
-            <svg class="ic"><use href="#i-download"/></svg>
-            <span>${downloads}</span>
-          </span>
-          <button class="btn ${btnClass} btn-sm btn-cf-install" ${canInstall ? '' : 'disabled'}>${btnLabel}</button>
-        </div>
-      `;
-
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-cf-install')) return;
-        openModModal(mod, latestFile);
-      });
-
-      const installBtn = card.querySelector('.btn-cf-install');
-      if (installBtn && canInstall) {
-        installBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          if (!latestFile) {
-            showToast('No downloadable file found for this mod', 'error');
-            return;
-          }
-          installBtn.disabled = true;
-          installBtn.textContent = 'Installing…';
-          try {
-            const r = await window.api.installCfMod(mod, latestFile, true);
-            if (r.success) {
-              showToast(`Installed ${mod.name}`, 'success');
-              installBtn.textContent = 'Installed';
-              installBtn.className = 'btn btn-ghost btn-sm';
-              await loadInstalledMods(false);
-            } else {
-              showToast(`Install failed: ${r.error}`, 'error');
-              installBtn.disabled = false;
-              installBtn.textContent = btnLabel;
-            }
-          } catch (err) {
-            showToast(`Install error: ${err.message}`, 'error');
-            installBtn.disabled = false;
-            installBtn.textContent = btnLabel;
-          }
-        });
-      }
-
-      frag.appendChild(card);
-    });
-
-    cfResultsGrid.appendChild(frag);
+    applyBrowseFilters();
   } catch (e) {
     cfResultsGrid.innerHTML = `<div class="empty"><div class="empty-title">CurseForge unavailable</div><div class="empty-sub">${escapeHtml(e.message)}</div></div>`;
   }
 }
 
-cfSortSelect.addEventListener('change', () => {
-  cfPageIndex = 0;
-  loadCurseForgeMods();
-});
-cfCategorySelect.addEventListener('change', () => {
-  cfPageIndex = 0;
-  loadCurseForgeMods();
-});
+function applyBrowseFilters() {
+  if (currentBrowseSource === 'curseforge') {
+    renderCurseForgeFilteredResults();
+  } else {
+    renderThunderstoreFilteredResults();
+  }
+}
+
+function renderCurseForgeFilteredResults() {
+  let mods = [...rawBrowseModsCache];
+
+  // 1. Multi-category filtering: mod must have at least one of the selected categories (if any selected)
+  if (selectedBrowseCategories.size > 0) {
+    mods = mods.filter((mod) => {
+      const modCatIds = (mod.categories || []).map((c) => c.id);
+      return Array.from(selectedBrowseCategories).some((selectedId) => modCatIds.includes(selectedId));
+    });
+  }
+
+  // 2. Last updated date filtering
+  const updatedFilter = browseUpdatedFilter.value;
+  if (updatedFilter !== 'all') {
+    const now = Date.now();
+    const daysMap = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
+    const maxAgeMs = (daysMap[updatedFilter] || 365) * 86400000;
+    mods = mods.filter((mod) => {
+      const modTime = mod.dateModified ? new Date(mod.dateModified).getTime() : 0;
+      return now - modTime <= maxAgeMs;
+    });
+  }
+
+  // 3. Client sorting
+  const sort = browseSortSelect.value;
+  if (sort === 'downloads') {
+    mods.sort((a, b) => (b.downloadCount || 0) - (a.downloadCount || 0));
+  } else if (sort === 'updated') {
+    mods.sort((a, b) => new Date(b.dateModified || 0).getTime() - new Date(a.dateModified || 0).getTime());
+  } else if (sort === 'name') {
+    mods.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+
+  if (mods.length === 0) {
+    cfResultsGrid.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">No matching mods found</div>
+        <div class="empty-sub">Try expanding your category or date filter parameters.</div>
+      </div>`;
+    return;
+  }
+
+  cfResultsGrid.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  mods.forEach((mod) => {
+    const card = document.createElement('div');
+    card.className = 'mod-card is-clickable';
+
+    const initial = (mod.name || 'M').charAt(0).toUpperCase();
+    const avatarHtml = mod.logo?.thumbnailUrl
+      ? `<img src="${escapeHtml(mod.logo.thumbnailUrl)}" alt="" loading="lazy">`
+      : escapeHtml(initial);
+
+    const authorName = (mod.authors || []).map((a) => a.name).join(', ') || 'Unknown';
+    const downloads = formatNumber(mod.downloadCount);
+    const latestFile = mod.latestFiles?.[0] || null;
+
+    const installedMatch = currentInstalledMods.find(
+      (m) => m.remoteId === mod.id || (m.manifest?.name || '').toLowerCase() === (mod.name || '').toLowerCase()
+    );
+
+    let btnLabel = 'Install';
+    let btnClass = 'btn-primary';
+    const canInstall = !installedMatch || installedMatch.updateAvailable;
+    if (installedMatch) {
+      // FIX 3: Update button styled with crisp blue .btn-update
+      btnLabel = installedMatch.updateAvailable ? 'Update' : 'Installed';
+      btnClass = installedMatch.updateAvailable ? 'btn-update' : 'btn-ghost';
+    }
+
+    card.innerHTML = `
+      <div class="mod-card-head">
+        <div class="mod-avatar">${avatarHtml}</div>
+        <div class="mod-card-titles">
+          <div class="mod-card-name" title="${escapeHtml(mod.name)}">${escapeHtml(mod.name)}</div>
+          <div class="mod-card-by">by ${escapeHtml(authorName)}</div>
+        </div>
+      </div>
+      <div class="mod-card-desc">${escapeHtml(mod.summary || 'No description provided.')}</div>
+      <div class="mod-card-foot">
+        <span class="mod-card-stat">
+          <svg class="ic"><use href="#i-download"/></svg>
+          <span>${downloads}</span>
+        </span>
+        <button class="btn ${btnClass} btn-sm btn-cf-install" ${canInstall ? '' : 'disabled'}>${btnLabel}</button>
+      </div>
+    `;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-cf-install')) return;
+      openModModal(mod, latestFile);
+    });
+
+    const installBtn = card.querySelector('.btn-cf-install');
+    if (installBtn && canInstall) {
+      installBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!latestFile) {
+          showToast('No downloadable file found for this mod', 'error');
+          return;
+        }
+        installBtn.disabled = true;
+        installBtn.textContent = 'Installing…';
+        try {
+          const r = await window.api.installCfMod(mod, latestFile, true);
+          if (r.success) {
+            showToast(`Installed ${mod.name}`, 'success');
+            installBtn.textContent = 'Installed';
+            installBtn.className = 'btn btn-ghost btn-sm';
+            await loadInstalledMods(false);
+          } else {
+            showToast(`Install failed: ${r.error}`, 'error');
+            installBtn.disabled = false;
+            installBtn.textContent = btnLabel;
+          }
+        } catch (err) {
+          showToast(`Install error: ${err.message}`, 'error');
+          installBtn.disabled = false;
+          installBtn.textContent = btnLabel;
+        }
+      });
+    }
+
+    frag.appendChild(card);
+  });
+
+  cfResultsGrid.appendChild(frag);
+}
+
 cfPrevPage.addEventListener('click', () => {
   if (cfPageIndex > 0) {
     cfPageIndex--;
@@ -1123,98 +1458,126 @@ cfNextPage.addEventListener('click', () => {
   loadCurseForgeMods();
 });
 
+let rawThunderstoreModsCache = [];
+
 async function loadThunderstoreMods() {
   try {
     renderSkeletonCards(tsResultsGrid, 6);
 
     const pkgs = await window.api.searchThunderstore({
       searchFilter: browseSearchInput.value.trim(),
-      sort: tsSortSelect.value,
+      sort: browseSortSelect.value,
     });
 
     tsLoadedOnce = true;
-
-    if (!pkgs || pkgs.length === 0) {
-      tsResultsGrid.innerHTML = `
-        <div class="empty">
-          <div class="empty-title">No Thunderstore packages found</div>
-          <div class="empty-sub">No community packages matched your filter.</div>
-        </div>`;
-      return;
-    }
-
-    tsResultsGrid.innerHTML = '';
-    const frag = document.createDocumentFragment();
-
-    pkgs.forEach((pkg) => {
-      const card = document.createElement('div');
-      card.className = 'mod-card';
-
-      const initial = (pkg.name || 'T').charAt(0).toUpperCase();
-      const avatarHtml = pkg.icon_url ? `<img src="${escapeHtml(pkg.icon_url)}" alt="" loading="lazy">` : escapeHtml(initial);
-      const downloads = formatNumber(pkg.download_count);
-
-      const isInstalled = currentInstalledMods.some(
-        (m) =>
-          m.remoteId === `${pkg.namespace}/${pkg.name}` ||
-          (m.manifest?.name || '').toLowerCase() === (pkg.name || '').toLowerCase()
-      );
-
-      card.innerHTML = `
-        <div class="mod-card-head">
-          <div class="mod-avatar">${avatarHtml}</div>
-          <div class="mod-card-titles">
-            <div class="mod-card-name" title="${escapeHtml(pkg.name)}">${escapeHtml(pkg.name)}</div>
-            <div class="mod-card-by">by ${escapeHtml(pkg.namespace)}</div>
-          </div>
-        </div>
-        <div class="mod-card-desc">${escapeHtml(pkg.description || 'No description provided.')}</div>
-        <div class="mod-card-foot">
-          <span class="mod-card-stat">
-            <svg class="ic"><use href="#i-download"/></svg>
-            <span>${downloads}</span>
-          </span>
-          <button class="btn ${isInstalled ? 'btn-ghost' : 'btn-primary'} btn-sm btn-ts-install" ${isInstalled ? 'disabled' : ''}>
-            ${isInstalled ? 'Installed' : 'Install'}
-          </button>
-        </div>
-      `;
-
-      const installBtn = card.querySelector('.btn-ts-install');
-      if (installBtn && !isInstalled) {
-        installBtn.addEventListener('click', async () => {
-          installBtn.disabled = true;
-          installBtn.textContent = 'Installing…';
-          try {
-            const res = await window.api.installThunderstore(pkg);
-            if (res.success) {
-              showToast(`Installed ${pkg.name}`, 'success');
-              installBtn.textContent = 'Installed';
-              installBtn.className = 'btn btn-ghost btn-sm';
-              await loadInstalledMods(false);
-            } else {
-              showToast(`Install failed: ${res.error}`, 'error');
-              installBtn.disabled = false;
-              installBtn.textContent = 'Install';
-            }
-          } catch (err) {
-            showToast(`Error: ${err.message}`, 'error');
-            installBtn.disabled = false;
-            installBtn.textContent = 'Install';
-          }
-        });
-      }
-
-      frag.appendChild(card);
-    });
-
-    tsResultsGrid.appendChild(frag);
+    rawThunderstoreModsCache = pkgs || [];
+    renderThunderstoreFilteredResults();
   } catch (e) {
     tsResultsGrid.innerHTML = `<div class="empty"><div class="empty-title">Thunderstore unavailable</div><div class="empty-sub">${escapeHtml(e.message)}</div></div>`;
   }
 }
 
-tsSortSelect.addEventListener('change', loadThunderstoreMods);
+function renderThunderstoreFilteredResults() {
+  let pkgs = [...rawThunderstoreModsCache];
+
+  // Date filtering
+  const updatedFilter = browseUpdatedFilter.value;
+  if (updatedFilter !== 'all') {
+    const now = Date.now();
+    const daysMap = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
+    const maxAgeMs = (daysMap[updatedFilter] || 365) * 86400000;
+    pkgs = pkgs.filter((pkg) => {
+      const pkgTime = pkg.date_modified ? new Date(pkg.date_modified).getTime() : 0;
+      return now - pkgTime <= maxAgeMs;
+    });
+  }
+
+  // Sort
+  const sort = browseSortSelect.value;
+  if (sort === 'downloads') {
+    pkgs.sort((a, b) => (b.download_count || 0) - (a.download_count || 0));
+  } else if (sort === 'updated') {
+    pkgs.sort((a, b) => new Date(b.date_modified || 0).getTime() - new Date(a.date_modified || 0).getTime());
+  } else if (sort === 'name') {
+    pkgs.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+
+  if (pkgs.length === 0) {
+    tsResultsGrid.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">No Thunderstore packages found</div>
+        <div class="empty-sub">No community packages matched your parameters.</div>
+      </div>`;
+    return;
+  }
+
+  tsResultsGrid.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  pkgs.forEach((pkg) => {
+    const card = document.createElement('div');
+    card.className = 'mod-card';
+
+    const initial = (pkg.name || 'T').charAt(0).toUpperCase();
+    const avatarHtml = pkg.icon_url ? `<img src="${escapeHtml(pkg.icon_url)}" alt="" loading="lazy">` : escapeHtml(initial);
+    const downloads = formatNumber(pkg.download_count);
+
+    const isInstalled = currentInstalledMods.some(
+      (m) =>
+        m.remoteId === `${pkg.namespace}/${pkg.name}` ||
+        (m.manifest?.name || '').toLowerCase() === (pkg.name || '').toLowerCase()
+    );
+
+    card.innerHTML = `
+      <div class="mod-card-head">
+        <div class="mod-avatar">${avatarHtml}</div>
+        <div class="mod-card-titles">
+          <div class="mod-card-name" title="${escapeHtml(pkg.name)}">${escapeHtml(pkg.name)}</div>
+          <div class="mod-card-by">by ${escapeHtml(pkg.namespace)}</div>
+        </div>
+      </div>
+      <div class="mod-card-desc">${escapeHtml(pkg.description || 'No description provided.')}</div>
+      <div class="mod-card-foot">
+        <span class="mod-card-stat">
+          <svg class="ic"><use href="#i-download"/></svg>
+          <span>${downloads}</span>
+        </span>
+        <button class="btn ${isInstalled ? 'btn-ghost' : 'btn-primary'} btn-sm btn-ts-install" ${isInstalled ? 'disabled' : ''}>
+          ${isInstalled ? 'Installed' : 'Install'}
+        </button>
+      </div>
+    `;
+
+    const installBtn = card.querySelector('.btn-ts-install');
+    if (installBtn && !isInstalled) {
+      installBtn.addEventListener('click', async () => {
+        installBtn.disabled = true;
+        installBtn.textContent = 'Installing…';
+        try {
+          const res = await window.api.installThunderstore(pkg);
+          if (res.success) {
+            showToast(`Installed ${pkg.name}`, 'success');
+            installBtn.textContent = 'Installed';
+            installBtn.className = 'btn btn-ghost btn-sm';
+            await loadInstalledMods(false);
+          } else {
+            showToast(`Install failed: ${res.error}`, 'error');
+            installBtn.disabled = false;
+            installBtn.textContent = 'Install';
+          }
+        } catch (err) {
+          showToast(`Error: ${err.message}`, 'error');
+          installBtn.disabled = false;
+          installBtn.textContent = 'Install';
+        }
+      });
+    }
+
+    frag.appendChild(card);
+  });
+
+  tsResultsGrid.appendChild(frag);
+}
 
 // ============================================================================
 // Mod Details Modal
@@ -1270,7 +1633,6 @@ async function openModModal(mod, latestFile) {
 
 modalCloseBtn.addEventListener('click', () => modModal.classList.add('hidden'));
 
-// Close modals on backdrop click
 [modModal, installModal].forEach((m) => {
   m.addEventListener('click', (e) => {
     if (e.target === m) m.classList.add('hidden');
@@ -1387,7 +1749,7 @@ btnImportProfile.addEventListener('click', async () => {
 });
 
 // ============================================================================
-// Server Runner & Console (rAF-batched logs + smart auto-scroll)
+// Server Runner & Console (Green Start, Red Stop, No Overview Duplicate)
 // ============================================================================
 async function refreshServerStatus() {
   try {
@@ -1405,11 +1767,12 @@ function setToggleButtonsState(running, busyText = null) {
       return;
     }
     btn.disabled = false;
+    // FIX 3: Start button is green (.btn-start), Stop button is red (.btn-stop)
     if (running) {
-      btn.className = `btn btn-danger ${btn === quickServerBtn ? 'btn-sm ' : ''}server-toggle`;
+      btn.className = `btn btn-stop ${btn === quickServerBtn ? 'btn-sm ' : ''}server-toggle`;
       btn.innerHTML = `<svg class="ic"><use href="#i-stop"/></svg><span>Stop</span>`;
     } else {
-      btn.className = `btn btn-primary ${btn === quickServerBtn ? 'btn-sm ' : ''}server-toggle`;
+      btn.className = `btn btn-start ${btn === quickServerBtn ? 'btn-sm ' : ''}server-toggle`;
       btn.innerHTML = `<svg class="ic"><use href="#i-play"/></svg><span>Start</span>`;
     }
   });
@@ -1585,7 +1948,7 @@ btnClearConsole.addEventListener('click', () => {
 });
 
 // ============================================================================
-// Auto-Saving Settings & Folder Actions
+// Auto-Saving Settings & Folder Actions (Configurable Default Behaviors)
 // ============================================================================
 async function handleChooseServerFolder() {
   const chosen = await window.api.selectServerDir();
@@ -1606,18 +1969,53 @@ function openServerFolder() {
 heroFolderBtn.addEventListener('click', openServerFolder);
 dashServerDir.addEventListener('click', openServerFolder);
 
-function bindLaunchModeSegmented(container) {
+function bindSegmentedControl(container, onSelect) {
+  if (!container) return;
   container.querySelectorAll('button[data-value]').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const mode = btn.dataset.value;
-      await saveConfigPatch({ launchMode: mode });
-      updateServerStatusUI(lastServerStatus);
+      const val = btn.dataset.value;
+      setSegmentedValue(container, val);
+      await onSelect(val);
     });
   });
 }
 
-bindLaunchModeSegmented(consoleLaunchMode);
-bindLaunchModeSegmented(settingsLaunchMode);
+bindSegmentedControl(consoleLaunchMode, async (val) => {
+  await saveConfigPatch({ launchMode: val });
+  updateServerStatusUI(lastServerStatus);
+});
+
+bindSegmentedControl(settingsLaunchMode, async (val) => {
+  await saveConfigPatch({ launchMode: val });
+  updateServerStatusUI(lastServerStatus);
+});
+
+// FIX 6: Default behavior settings
+bindSegmentedControl(settingsCloseAction, async (val) => {
+  const closeToTray = val === 'tray';
+  await saveConfigPatch({ closeToTray });
+});
+
+bindSegmentedControl(settingsStartupBehavior, async (val) => {
+  await saveConfigPatch({ startupBehavior: val });
+  const openAsHidden = val === 'tray';
+  if (settingsLoginItem.checked) {
+    await window.api.setLoginItem(true, openAsHidden);
+  }
+});
+
+settingsLoginItem.addEventListener('change', async () => {
+  const enabled = settingsLoginItem.checked;
+  settingRowStartupBehavior?.classList.toggle('hidden', !enabled);
+  const openAsHidden = (appConfig?.startupBehavior || 'tray') === 'tray';
+  await window.api.setLoginItem(enabled, openAsHidden);
+});
+
+if (settingsAutoStartServer) {
+  settingsAutoStartServer.addEventListener('change', async () => {
+    await saveConfigPatch({ autoStartServer: settingsAutoStartServer.checked });
+  });
+}
 
 settingsMaxRam.addEventListener('change', () => {
   saveConfigPatch({ maxRam: settingsMaxRam.value });
@@ -1626,15 +2024,6 @@ settingsMaxRam.addEventListener('change', () => {
 settingsPatchline.addEventListener('change', async () => {
   await saveConfigPatch({ patchline: settingsPatchline.value });
   await checkServerVersion();
-});
-
-settingsCloseToTray.addEventListener('change', () => {
-  saveConfigPatch({ closeToTray: settingsCloseToTray.checked });
-});
-
-settingsLoginItem.addEventListener('change', async () => {
-  const enabled = await window.api.setLoginItem(settingsLoginItem.checked);
-  settingsLoginItem.checked = Boolean(enabled);
 });
 
 const saveApiKeyDebounced = debounce(() => {
