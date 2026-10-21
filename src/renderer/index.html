@@ -42,6 +42,7 @@
     <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></symbol>
     <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
     <symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><polyline points="12 7 12 12 15 15"/></symbol>
   </svg>
 
   <div class="app" id="app">
@@ -301,6 +302,9 @@
                 <button id="btn-update-all-mods" class="btn btn-update btn-sm hidden">
                   <svg class="ic"><use href="#i-update"/></svg><span>Update all</span>
                 </button>
+                <button id="btn-library-restore-point" class="btn btn-secondary btn-sm" title="Restore server config & mod states from last working state">
+                  <svg class="ic"><use href="#i-history"/></svg><span>Restore point</span>
+                </button>
                 <button id="btn-refresh-installed-mods" class="icon-btn" title="Check for updates" aria-label="Check for updates">
                   <svg class="ic"><use href="#i-refresh"/></svg>
                 </button>
@@ -410,6 +414,32 @@
         <!-- ============================ PROFILES ============================ -->
         <section id="tab-profiles" class="page" aria-label="Profiles">
           <div class="page-inner">
+            <!-- Restore Point Banner -->
+            <div id="restore-point-banner" class="restore-point-card">
+              <div class="restore-point-left">
+                <div class="restore-point-icon">
+                  <svg class="ic"><use href="#i-history"/></svg>
+                </div>
+                <div class="restore-point-details">
+                  <div class="restore-point-title-row">
+                    <span class="restore-point-heading">Last Known Good State</span>
+                    <span id="restore-point-status-tag" class="tag tag-success">Available</span>
+                  </div>
+                  <div id="restore-point-subtext" class="restore-point-subtext">
+                    Automatically created when the server launches successfully.
+                  </div>
+                </div>
+              </div>
+              <div class="restore-point-actions">
+                <button id="btn-create-restore-point" class="btn btn-secondary btn-sm" title="Create a manual snapshot right now">
+                  <svg class="ic"><use href="#i-plus"/></svg><span>Snapshot now</span>
+                </button>
+                <button id="btn-apply-restore-point" class="btn btn-primary btn-sm" title="Restore server config & mod states to last working snapshot">
+                  <svg class="ic"><use href="#i-history"/></svg><span>Restore state</span>
+                </button>
+              </div>
+            </div>
+
             <div class="page-intro">
               <p class="muted">Save your current mod set and switch between setups in one click.</p>
               <div class="toolbar-end">

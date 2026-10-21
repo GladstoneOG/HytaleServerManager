@@ -124,6 +124,18 @@ async function createWindow() {
     tsClient,
   });
 
+  // Automatic restore point creation on successful server launch
+  serverRunner.on('server-ready', async (data) => {
+    try {
+      const restoreInfo = await modManager.createRestorePoint('Last successful server launch');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('restore-point:updated', restoreInfo);
+      }
+    } catch (err) {
+      console.warn('[Manager] Failed to create automatic restore point:', err.message);
+    }
+  });
+
   // Check if an external or previously detached HytaleServer.jar is already running
   serverRunner.findRunningServerProcess().catch(() => {});
 

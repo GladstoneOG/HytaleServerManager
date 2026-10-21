@@ -1627,6 +1627,78 @@ summary,
 }
 
 /* ============================================================================
+   Restore Point Banner & Card
+   ============================================================================ */
+.restore-point-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.05), rgba(16, 185, 129, 0.05));
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.restore-point-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.restore-point-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.restore-point-icon .ic {
+  width: 20px;
+  height: 20px;
+}
+
+.restore-point-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.restore-point-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.restore-point-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.restore-point-subtext {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.restore-point-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ============================================================================
    Settings
    ============================================================================ */
 .settings-group {

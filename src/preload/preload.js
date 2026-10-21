@@ -61,6 +61,16 @@ contextBridge.exposeInMainWorld('api', {
   exportProfileDialog: (name) => ipcRenderer.invoke('profiles:export-dialog', name),
   importProfileDialog: () => ipcRenderer.invoke('profiles:import-dialog'),
 
+  // Restore Points
+  getRestorePoint: () => ipcRenderer.invoke('restore-point:get'),
+  createRestorePoint: (reason) => ipcRenderer.invoke('restore-point:create', reason),
+  applyRestorePoint: () => ipcRenderer.invoke('restore-point:apply'),
+  onRestorePointUpdated: (cb) => {
+    const fn = (_, data) => cb(data);
+    ipcRenderer.on('restore-point:updated', fn);
+    return () => ipcRenderer.removeListener('restore-point:updated', fn);
+  },
+
   // Server Console / Execution
   getServerStatus: () => ipcRenderer.invoke('server:status'),
   startServer: (opts) => ipcRenderer.invoke('server:start', opts),

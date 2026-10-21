@@ -179,23 +179,28 @@ async function run() {
 
   // Test 14: Mod Manager Atomic Toggling & Anti-Spam
   console.log('Test 14: Mod Manager Atomic Toggling & Anti-Spam');
-  const testModMan = new ModManager({ serverDir: 'F:\\serverht\\Server' });
+  const tempToggleDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'hytale_toggle_test_'));
+  const tempModsDir = path.join(tempToggleDir, 'mods');
+  await fsp.mkdir(tempModsDir, { recursive: true });
+  const dummyJarPath = path.join(tempModsDir, 'DummyMod-1.0.0.jar');
+  await fsp.writeFile(dummyJarPath, 'PK\x05\x06' + '\x00'.repeat(18));
+  const testModMan = new ModManager({ serverDir: tempToggleDir });
   const installedMods = await testModMan.getInstalledMods(false);
-  if (installedMods.length > 0) {
-    const testTarget = installedMods[0];
-    const initialEnabled = testTarget.isEnabled;
-    // Spam 4 concurrent toggle requests in parallel
-    const spamResults = await Promise.all([
-      testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
-      testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
-      testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
-      testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
-    ]);
-    assert.strictEqual(spamResults.every((r) => r.success), true);
-    // Restore back to original state
-    await testModMan.setModEnabled(spamResults[0].newFileName, initialEnabled);
-    console.log('  ✓ Concurrent duplicate toggle calls executed cleanly without race conditions');
-  }
+  assert(installedMods.length === 1);
+  const testTarget = installedMods[0];
+  const initialEnabled = testTarget.isEnabled;
+  // Spam 4 concurrent toggle requests in parallel
+  const spamResults = await Promise.all([
+    testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
+    testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
+    testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
+    testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
+  ]);
+  assert.strictEqual(spamResults.every((r) => r.success), true);
+  // Restore back to original state
+  await testModMan.setModEnabled(spamResults[0].newFileName, initialEnabled);
+  await fsp.rm(tempToggleDir, { recursive: true, force: true });
+  console.log('  ✓ Concurrent duplicate toggle calls executed cleanly without race conditions');
 
   // Test 15: CurseForge Release vs Beta File Selection & Compatibility
   console.log('Test 15: CurseForge Release vs Beta Selection & Compatibility');
@@ -275,7 +280,70 @@ async function run() {
   await fsp.rm(tempConfigDir, { recursive: true, force: true });
   console.log('  ✓ Config sanitization stripped illegal non-namespaced keys cleanly');
 
-  console.log('\n🎉 ALL 17 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 18: Automatic Restore Point Snapshotting, Rollback & Strict Update Logic
+  console.log('Test 18: Restore Point Snapshotting & Strict Update Logic');
+  const tempRestoreDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'hytale_restore_test_'));
+  const tempRestoreMods = path.join(tempRestoreDir, 'mods');
+  await fsp.mkdir(tempRestoreMods, { recursive: true });
+  const jarA = path.join(tempRestoreMods, 'ModA-1.0.0.jar');
+  const jarB = path.join(tempRestoreMods, 'ModB-1.0.0.jar.disabled');
+  await fsp.writeFile(jarA, 'PK\x05\x06' + '\x00'.repeat(18));
+  await fsp.writeFile(jarB, 'PK\x05\x06' + '\x00'.repeat(18));
+  await fsp.writeFile(path.join(tempRestoreDir, 'config.json'), JSON.stringify({
+    Version: 4,
+    Mods: { 'group:ModB': { Enabled: false } }
+  }));
+
+  const restoreMgr = new ModManager({ serverDir: tempRestoreDir });
+
+  // 1. Initial snapshot
+  const snapshot = await restoreMgr.createRestorePoint('Test Launch Snapshot');
+  assert.strictEqual(snapshot.success, true);
+  assert.strictEqual(snapshot.modCount, 2);
+
+  // 2. Query restore point info
+  const info = await restoreMgr.getRestorePointInfo();
+  assert.strictEqual(info.exists, true);
+  assert.strictEqual(info.modCount, 2);
+  assert.strictEqual(info.enabledCount, 1);
+  assert.strictEqual(info.disabledCount, 1);
+
+  // 3. User modifies config, toggles ModA off, ModB on, and adds a crashing ModC
+  await restoreMgr.setModEnabled('ModA-1.0.0.jar', false);
+  await restoreMgr.setModEnabled('ModB-1.0.0.jar.disabled', true);
+  const jarC = path.join(tempRestoreMods, 'CrashingMod-1.0.0.jar');
+  await fsp.writeFile(jarC, 'PK\x05\x06' + '\x00'.repeat(18));
+  await fsp.writeFile(path.join(tempRestoreDir, 'config.json'), JSON.stringify({
+    Version: 4,
+    Mods: { 'corrupt:Broken': { Enabled: true } }
+  }));
+
+  const midState = await restoreMgr.getInstalledMods(false);
+  const midModA = midState.find((m) => m.fileName.includes('ModA'));
+  const midModB = midState.find((m) => m.fileName.includes('ModB'));
+  const midModC = midState.find((m) => m.fileName.includes('CrashingMod'));
+  assert.strictEqual(midModA.isEnabled, false);
+  assert.strictEqual(midModB.isEnabled, true);
+  assert.strictEqual(midModC.isEnabled, true);
+
+  // 4. Restore state
+  const restored = await restoreMgr.restoreLastKnownGoodState();
+  assert.strictEqual(restored.success, true);
+
+  const afterState = await restoreMgr.getInstalledMods(false);
+  const afterModA = afterState.find((m) => m.fileName.includes('ModA'));
+  const afterModB = afterState.find((m) => m.fileName.includes('ModB'));
+  const afterModC = afterState.find((m) => m.fileName.includes('CrashingMod'));
+
+  assert.strictEqual(afterModA.isEnabled, true);
+  assert.strictEqual(afterModB.isEnabled, false);
+  // The newly added crash-inducing mod is automatically disabled
+  assert.strictEqual(afterModC.isEnabled, false);
+
+  await fsp.rm(tempRestoreDir, { recursive: true, force: true });
+  console.log('  ✓ Restore point snapshot created, verified, and restored cleanly');
+
+  console.log('\n🎉 ALL 18 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

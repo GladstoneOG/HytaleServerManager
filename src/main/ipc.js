@@ -307,6 +307,23 @@ function registerIpcHandlers({
     return { canceled: true };
   });
 
+  // --- Restore Points ---
+  ipcMain.handle('restore-point:get', async () => {
+    return await modManager.getRestorePointInfo();
+  });
+
+  ipcMain.handle('restore-point:create', async (_, reason) => {
+    return await modManager.createRestorePoint(reason || 'Manual snapshot');
+  });
+
+  ipcMain.handle('restore-point:apply', async () => {
+    try {
+      return await modManager.restoreLastKnownGoodState();
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
   // --- Server Runner / Console ---
   ipcMain.handle('server:status', async () => {
     await serverRunner.findRunningServerProcess();

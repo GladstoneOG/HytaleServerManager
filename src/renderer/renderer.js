@@ -76,6 +76,7 @@ const modsFilter = $('mods-filter');
 const modsSourceFilter = $('mods-source-filter');
 const modsSortSelect = $('mods-sort-select');
 const btnUpdateAllMods = $('btn-update-all-mods');
+const btnLibraryRestorePoint = $('btn-library-restore-point');
 const btnRefreshInstalledMods = $('btn-refresh-installed-mods');
 const btnOpenModsFolder = $('btn-open-mods-folder');
 const installedModsList = $('installed-mods-list');
@@ -114,6 +115,11 @@ const tsResultsGrid = $('ts-results-grid');
 const btnImportProfile = $('btn-import-profile');
 const btnCreateProfile = $('btn-create-profile');
 const profilesList = $('profiles-list');
+const restorePointBanner = $('restore-point-banner');
+const restorePointStatusTag = $('restore-point-status-tag');
+const restorePointSubtext = $('restore-point-subtext');
+const btnCreateRestorePoint = $('btn-create-restore-point');
+const btnApplyRestorePoint = $('btn-apply-restore-point');
 
 // Settings
 const settingsServerDir = $('settings-server-dir');
@@ -489,6 +495,7 @@ function switchTab(tabId) {
     if (currentBrowseSource === 'thunderstore' && !tsLoadedOnce) loadThunderstoreMods();
   } else if (tabId === 'profiles') {
     loadProfiles();
+    loadRestorePointUI();
   } else if (tabId === 'console') {
     scrollToConsoleBottom();
     consoleInput.focus();
@@ -572,6 +579,7 @@ async function init() {
       checkServerVersion(),
       loadInstalledMods(true),
       loadProfilesCount(),
+      loadRestorePointUI(),
       loadCfCategories(),
     ]);
   } catch (e) {
@@ -2041,6 +2049,94 @@ btnImportProfile.addEventListener('click', async () => {
   } catch (e) {
     showToast(`Import error: ${e.message}`, 'error');
   }
+});
+
+// ============================================================================
+// Restore Point UI (Automatic Snapshot on Launch & 1-Click Rollback)
+// ============================================================================
+let currentRestorePointInfo = null;
+
+async function loadRestorePointUI() {
+  try {
+    const info = await window.api.getRestorePoint();
+    currentRestorePointInfo = info;
+    if (info && info.exists) {
+      if (restorePointStatusTag) {
+        restorePointStatusTag.textContent = 'Active';
+        restorePointStatusTag.className = 'tag tag-success';
+      }
+      if (restorePointSubtext) {
+        const timeStr = new Date(info.createdAt).toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        restorePointSubtext.textContent = `Snapshot saved: ${timeStr} • ${info.modCount} mod(s) (${info.enabledCount} enabled) • Reason: ${info.reason || 'Server launch'}`;
+      }
+      if (btnApplyRestorePoint) btnApplyRestorePoint.disabled = false;
+    } else {
+      if (restorePointStatusTag) {
+        restorePointStatusTag.textContent = 'None';
+        restorePointStatusTag.className = 'tag';
+      }
+      if (restorePointSubtext) {
+        restorePointSubtext.textContent = 'No restore point saved yet. Will automatically save when the server runs stably.';
+      }
+      if (btnApplyRestorePoint) btnApplyRestorePoint.disabled = true;
+    }
+  } catch (err) {
+    console.warn('Failed to load restore point info:', err);
+  }
+}
+
+async function handleApplyRestorePoint() {
+  const info = currentRestorePointInfo || (await window.api.getRestorePoint());
+  if (!info || !info.exists) {
+    showToast('No restore point found yet. Run the server once to automatically create one.', 'warning');
+    return;
+  }
+
+  const timeStr = new Date(info.createdAt).toLocaleString();
+  const ok = await confirmDialog({
+    title: '🔄 Restore Last Known Good State',
+    message: `Revert server config and mod states to the snapshot taken on ${timeStr} (${info.modCount} mods)?\n\nAny newly installed mods that might be causing crashes will be safely disabled.`,
+    confirmLabel: 'Restore state',
+    danger: false,
+  });
+  if (!ok) return;
+
+  try {
+    const res = await window.api.applyRestorePoint();
+    if (res && res.success) {
+      showToast(`Restored to state from ${timeStr} (${res.revertedCount || 0} mods updated)`, 'success');
+      await Promise.all([loadInstalledMods(false), loadProfiles(), loadRestorePointUI()]);
+    } else {
+      throw new Error(res?.error || 'Failed to restore snapshot');
+    }
+  } catch (e) {
+    showToast(`Failed to restore state: ${e.message}`, 'error');
+  }
+}
+
+btnApplyRestorePoint?.addEventListener('click', handleApplyRestorePoint);
+btnLibraryRestorePoint?.addEventListener('click', handleApplyRestorePoint);
+
+btnCreateRestorePoint?.addEventListener('click', async () => {
+  try {
+    const res = await window.api.createRestorePoint('Manual user snapshot');
+    if (res && res.success) {
+      showToast('Created restore point snapshot', 'success');
+      await loadRestorePointUI();
+    }
+  } catch (e) {
+    showToast(`Failed to snapshot restore point: ${e.message}`, 'error');
+  }
+});
+
+window.api.onRestorePointUpdated(async (info) => {
+  currentRestorePointInfo = info;
+  await loadRestorePointUI();
 });
 
 // ============================================================================

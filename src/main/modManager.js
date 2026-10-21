@@ -65,6 +65,7 @@ class ModManager {
     this.ts = thunderstoreClient;
     this.metadataFile = path.join(this.serverDir, '.hytale_mod_manager.json');
     this.profilesDir = path.join(this.serverDir, '.mod_profiles');
+    this.restorePointDir = path.join(this.serverDir, '.restore_point');
     this._actionLocks = new Map();
   }
 
@@ -87,6 +88,7 @@ class ModManager {
     this.serverDir = dir;
     this.metadataFile = path.join(this.serverDir, '.hytale_mod_manager.json');
     this.profilesDir = path.join(this.serverDir, '.mod_profiles');
+    this.restorePointDir = path.join(this.serverDir, '.restore_point');
   }
 
   get modsDir() {
@@ -95,6 +97,25 @@ class ModManager {
 
   get configFile() {
     return path.join(this.serverDir, 'config.json');
+  }
+
+  /**
+   * Detect current installed version by inspecting HytaleServer.jar
+   */
+  async getServerVersion() {
+    const jarPath = path.join(this.serverDir, 'HytaleServer.jar');
+    if (await exists(jarPath)) {
+      try {
+        const manifestText = await readEntryText(jarPath, 'META-INF/MANIFEST.MF');
+        if (manifestText) {
+          const match = manifestText.match(/Implementation-Version:\s*([^\r\n]+)/i);
+          if (match && match[1].trim()) {
+            return match[1].trim();
+          }
+        }
+      } catch {}
+    }
+    return '0.7.1';
   }
 
   /**
@@ -206,6 +227,7 @@ class ModManager {
         },
         source: savedMeta.source || 'local',
         remoteId: savedMeta.remoteId || null,
+        curseforgeFileId: savedMeta.fileId || null,
         remoteVersion: savedMeta.remoteVersion || null,
         iconUrl: savedMeta.iconUrl || null,
         updateAvailable: false,
@@ -219,6 +241,8 @@ class ModManager {
         filesToFingerprint.push(item);
       }
     }
+
+    const serverVersion = await this.getServerVersion();
 
     // Attempt remote fingerprint matching for unlinked jars
     if (filesToFingerprint.length > 0 && checkRemoteUpdates && this.cf) {
@@ -243,12 +267,12 @@ class ModManager {
               name: item.manifest.name,
             };
 
-            // Check if latest files have newer version
+            // Check if latest files have newer version (compatible Release build)
             if (match.latestFiles && match.latestFiles.length > 0) {
-              const latest = match.latestFiles[0];
-              if (latest.id > match.file.id) {
+              const bestFile = selectBestCurseForgeFile({ latestFiles: match.latestFiles }, serverVersion, false);
+              if (bestFile && bestFile.id > match.file.id && safeName(bestFile.fileName) !== safeName(item.fileName)) {
                 item.updateAvailable = true;
-                item.latestRemoteFile = latest;
+                item.latestRemoteFile = bestFile;
               }
             }
           }
@@ -259,11 +283,11 @@ class ModManager {
       }
     }
 
-    // Check updates for already-identified CurseForge mods
-    if (checkRemoteUpdates && this.cf) {
+    // Check updates for already-identified CurseForge & Thunderstore mods
+    if (checkRemoteUpdates) {
       let metaChanged = false;
       for (const item of installed) {
-        if (item.source === 'curseforge' && item.remoteId) {
+        if (item.source === 'curseforge' && item.remoteId && this.cf) {
           try {
             const modInfo = await this.cf.getMod(item.remoteId);
             if (modInfo) {
@@ -274,16 +298,41 @@ class ModManager {
                 metaChanged = true;
               }
               if (modInfo.latestFiles && modInfo.latestFiles.length > 0 && !item.updateAvailable) {
-                const latest = modInfo.latestFiles[0];
-                const curVer = item.manifest.version;
-                const newVer = latest.displayName || latest.fileName;
-                if (item.curseforgeFileId && latest.id > item.curseforgeFileId) {
-                  item.updateAvailable = true;
-                  item.latestRemoteFile = latest;
-                } else if (curVer && curVer !== 'Unknown' && newVer && !newVer.includes(curVer)) {
-                  item.updateAvailable = true;
-                  item.latestRemoteFile = latest;
+                const bestFile = selectBestCurseForgeFile(modInfo, serverVersion, false);
+                if (bestFile) {
+                  const isSameFile =
+                    (item.curseforgeFileId && bestFile.id === item.curseforgeFileId) ||
+                    safeName(bestFile.fileName) === safeName(item.fileName);
+
+                  if (!isSameFile) {
+                    const isIdNewer = item.curseforgeFileId ? bestFile.id > item.curseforgeFileId : false;
+                    const curVer = item.manifest.version;
+                    const newVer = bestFile.displayName || bestFile.fileName;
+                    const isVerNewer = (curVer && curVer !== 'Unknown')
+                      ? compareVersions(newVer, curVer) > 0
+                      : false;
+
+                    if (isIdNewer || isVerNewer) {
+                      item.updateAvailable = true;
+                      item.latestRemoteFile = bestFile;
+                    }
+                  }
                 }
+              }
+            }
+          } catch {
+            // Ignore single mod update check error
+          }
+        } else if (item.source === 'thunderstore' && item.remoteId && this.ts) {
+          try {
+            const [namespace, name] = item.remoteId.split('/');
+            const detail = await this.ts.getPackageDetail(namespace, name);
+            if (detail && detail.latest?.version_number) {
+              const latestVer = detail.latest.version_number;
+              const curVer = item.manifest.version || item.remoteVersion;
+              if (curVer && curVer !== 'Unknown' && compareVersions(latestVer, curVer) > 0) {
+                item.updateAvailable = true;
+                item.latestRemoteFile = detail.latest;
               }
             }
           } catch {
@@ -805,6 +854,157 @@ class ModManager {
     }
 
     return results;
+  }
+
+  // ==========================================
+  // RESTORE POINT MANAGEMENT
+  // ==========================================
+
+  /**
+   * Get metadata about the latest restore point
+   */
+  async getRestorePointInfo() {
+    const infoPath = path.join(this.restorePointDir, 'restore_info.json');
+    if (!(await exists(infoPath))) {
+      return { exists: false };
+    }
+    try {
+      const data = await readJson(infoPath);
+      if (!data || !data.createdAt) return { exists: false };
+      return {
+        exists: true,
+        createdAt: data.createdAt,
+        reason: data.reason || 'Automatic backup',
+        serverVersion: data.serverVersion || '0.7.1',
+        modCount: (data.mods || []).length,
+        enabledCount: (data.mods || []).filter((m) => m.isEnabled).length,
+        disabledCount: (data.mods || []).filter((m) => !m.isEnabled).length,
+        mods: data.mods || [],
+      };
+    } catch {
+      return { exists: false };
+    }
+  }
+
+  /**
+   * Create a restore point snapshot (server configs + mod list and statuses)
+   */
+  async createRestorePoint(reason = 'Last successful server launch') {
+    await ensureDir(this.restorePointDir);
+    const currentMods = await this.getInstalledMods(false);
+    const serverVersion = await this.getServerVersion();
+
+    // Backup config.json if it exists
+    if (await exists(this.configFile)) {
+      try {
+        await fsp.copyFile(this.configFile, path.join(this.restorePointDir, 'config.json.backup'));
+      } catch {}
+    }
+
+    // Backup metadata if it exists
+    if (await exists(this.metadataFile)) {
+      try {
+        await fsp.copyFile(this.metadataFile, path.join(this.restorePointDir, 'metadata.json.backup'));
+      } catch {}
+    }
+
+    const restoreInfo = {
+      createdAt: Date.now(),
+      reason,
+      serverVersion,
+      mods: currentMods.map((m) => ({
+        fileName: m.fileName,
+        name: m.manifest.name,
+        version: m.manifest.version,
+        isEnabled: m.isEnabled,
+        source: m.source,
+        remoteId: m.remoteId,
+        size: m.size,
+      })),
+    };
+
+    await writeJsonAtomic(path.join(this.restorePointDir, 'restore_info.json'), restoreInfo);
+    return {
+      success: true,
+      createdAt: restoreInfo.createdAt,
+      reason: restoreInfo.reason,
+      modCount: restoreInfo.mods.length,
+    };
+  }
+
+  /**
+   * Restore server config and mod states to last known good restore point
+   */
+  async restoreLastKnownGoodState() {
+    const infoPath = path.join(this.restorePointDir, 'restore_info.json');
+    if (!(await exists(infoPath))) {
+      throw new Error('No restore point found to restore from');
+    }
+
+    const restoreData = await readJson(infoPath);
+    if (!restoreData || !Array.isArray(restoreData.mods)) {
+      throw new Error('Restore point data is corrupted or incomplete');
+    }
+
+    // Restore config.json
+    const configBackup = path.join(this.restorePointDir, 'config.json.backup');
+    if (await exists(configBackup)) {
+      try {
+        await fsp.copyFile(configBackup, this.configFile);
+        await this.sanitizeServerConfig();
+      } catch (e) {
+        console.warn('Failed to restore config.json:', e.message);
+      }
+    }
+
+    // Restore metadata
+    const metaBackup = path.join(this.restorePointDir, 'metadata.json.backup');
+    if (await exists(metaBackup)) {
+      try {
+        await fsp.copyFile(metaBackup, this.metadataFile);
+      } catch (e) {
+        console.warn('Failed to restore metadata.json:', e.message);
+      }
+    }
+
+    // Revert mod states according to restore point
+    const currentMods = await this.getInstalledMods(false);
+    let revertedCount = 0;
+
+    for (const savedMod of restoreData.mods) {
+      const match = currentMods.find(
+        (m) =>
+          m.fileName === savedMod.fileName ||
+          m.manifest.name === savedMod.name ||
+          (savedMod.remoteId && m.remoteId === savedMod.remoteId)
+      );
+
+      if (match) {
+        if (match.isEnabled !== savedMod.isEnabled) {
+          await this.setModEnabled(match.fileName, savedMod.isEnabled);
+          revertedCount++;
+        }
+      }
+    }
+
+    // If there are new mods installed after the restore point that could cause a crash,
+    // safely disable them so the server can boot up cleanly in the verified state
+    for (const cur of currentMods) {
+      const wasInRestorePoint = restoreData.mods.some(
+        (m) => m.fileName.replace(/\.disabled$/, '') === cur.fileName.replace(/\.disabled$/, '')
+      );
+      if (!wasInRestorePoint && cur.isEnabled) {
+        await this.setModEnabled(cur.fileName, false);
+        revertedCount++;
+      }
+    }
+
+    return {
+      success: true,
+      createdAt: restoreData.createdAt,
+      modCount: restoreData.mods.length,
+      revertedCount,
+    };
   }
 }
 

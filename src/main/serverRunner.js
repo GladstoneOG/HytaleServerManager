@@ -271,6 +271,19 @@ class ServerRunner extends EventEmitter {
       // Query actual java PID after launch
       setTimeout(() => this.findRunningServerProcess(), 2000);
 
+      // Verify detached server is alive after 8s and emit server-ready
+      let detachedReady = false;
+      const detachedTimer = setTimeout(async () => {
+        if (!detachedReady && this.isRunning && this.isDetached) {
+          const res = await this.findRunningServerProcess();
+          if (res.isRunning) {
+            detachedReady = true;
+            this.emit('server-ready', { pid: res.pid, mode: 'detached' });
+          }
+        }
+      }, 8000);
+      if (detachedTimer.unref) detachedTimer.unref();
+
       return this.getStatus();
     }
 
@@ -289,10 +302,44 @@ class ServerRunner extends EventEmitter {
     this.detachedPid = this.process.pid;
     this.emit('status-change', this.getStatus());
 
+    let hasEmittedReady = false;
+    let readyTimer = null;
+
+    const emitReadyOnce = () => {
+      if (!hasEmittedReady && this.isRunning && this.process) {
+        hasEmittedReady = true;
+        if (readyTimer) {
+          clearTimeout(readyTimer);
+          readyTimer = null;
+        }
+        this.emit('server-ready', { pid: this.process.pid, mode: 'integrated' });
+      }
+    };
+
+    // If server stays alive for 8s without exiting or throwing startup exceptions
+    readyTimer = setTimeout(() => {
+      emitReadyOnce();
+    }, 8000);
+    if (readyTimer.unref) readyTimer.unref();
+
+    const checkLogForReady = (text) => {
+      if (hasEmittedReady) return;
+      if (
+        /setup transport!/i.test(text) ||
+        /Server session ID:/i.test(text) ||
+        /Loaded universe/i.test(text) ||
+        /Universe loaded/i.test(text) ||
+        /Listening on/i.test(text)
+      ) {
+        emitReadyOnce();
+      }
+    };
+
     this.process.stdout.on('data', (chunk) => {
       const text = chunk.toString('utf8');
       this._appendLog(text);
       this.emit('log', { type: 'stdout', text });
+      checkLogForReady(text);
     });
 
     this.process.stderr.on('data', (chunk) => {
@@ -302,6 +349,10 @@ class ServerRunner extends EventEmitter {
     });
 
     const handleExit = (code, signal, eventName) => {
+      if (readyTimer) {
+        clearTimeout(readyTimer);
+        readyTimer = null;
+      }
       if (!this.isRunning && !this.process) return;
       this.isRunning = false;
       this.isDetached = false;
@@ -317,6 +368,10 @@ class ServerRunner extends EventEmitter {
     this.process.on('exit', (code, signal) => handleExit(code, signal, 'exited'));
 
     this.process.on('error', (err) => {
+      if (readyTimer) {
+        clearTimeout(readyTimer);
+        readyTimer = null;
+      }
       this.isRunning = false;
       this.isDetached = false;
       this.process = null;
