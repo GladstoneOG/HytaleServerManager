@@ -459,7 +459,20 @@ async function run() {
   await fsp.rm(tempZipModDir, { recursive: true, force: true });
   console.log('  ✓ Verified both .jar and .zip mods are accurately detected and managed');
 
-  console.log('\n🎉 ALL 19 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 20: Console Log Timestamps Converted to Local PC Timezone
+  console.log('Test 20: Console Log Timestamps Converted to Local PC Timezone');
+  const { convertTimestampToLocal } = require('../src/main/serverRunner');
+  const utcLog = '[2026/10/21 02:15:26   INFO] [Hytale] Logger Initialized';
+  const converted = convertTimestampToLocal(utcLog);
+  const expectedDate = new Date('2026-10-21T02:15:26Z');
+  const expH = String(expectedDate.getHours()).padStart(2, '0');
+  const expMin = String(expectedDate.getMinutes()).padStart(2, '0');
+  const expSec = String(expectedDate.getSeconds()).padStart(2, '0');
+  assert(converted.includes(`${expH}:${expMin}:${expSec}`));
+  assert(converted.includes('[Hytale] Logger Initialized'));
+  console.log(`  ✓ Converted "${utcLog}" -> "${converted}" according to system timezone`);
+
+  console.log('\n🎉 ALL 20 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

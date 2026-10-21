@@ -14,6 +14,29 @@ const path = require('path');
 const { EventEmitter } = require('events');
 const { exists } = require('./util');
 
+/**
+ * Convert Hytale server's UTC timestamps [YYYY/MM/DD HH:mm:ss LEVEL] to the local PC timezone
+ */
+function convertTimestampToLocal(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(
+    /\[(\d{4})[/-](\d{2})[/-](\d{2})\s+(\d{2}):(\d{2}):(\d{2})(\s+[A-Z]+)?\]/g,
+    (match, y, m, d, hh, mm, ss, level) => {
+      const isoStr = `${y}-${m}-${d}T${hh}:${mm}:${ss}Z`;
+      const date = new Date(isoStr);
+      if (isNaN(date.getTime())) return match;
+      const localY = date.getFullYear();
+      const localM = String(date.getMonth() + 1).padStart(2, '0');
+      const localD = String(date.getDate()).padStart(2, '0');
+      const localH = String(date.getHours()).padStart(2, '0');
+      const localMin = String(date.getMinutes()).padStart(2, '0');
+      const localSec = String(date.getSeconds()).padStart(2, '0');
+      const levelStr = level || '';
+      return `[${localY}/${localM}/${localD} ${localH}:${localMin}:${localSec}${levelStr}]`;
+    }
+  );
+}
+
 class ServerRunner extends EventEmitter {
   constructor({ serverDir = 'F:\\serverht\\Server' } = {}) {
     super();
@@ -239,7 +262,9 @@ class ServerRunner extends EventEmitter {
       assetsPath = path.join('..', 'Assets.zip');
     }
 
+    const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     const javaArgs = [
+      `-Duser.timezone=${localTimezone}`,
       ...jvmOptions,
       '-jar',
       'HytaleServer.jar',
@@ -336,14 +361,16 @@ class ServerRunner extends EventEmitter {
     };
 
     this.process.stdout.on('data', (chunk) => {
-      const text = chunk.toString('utf8');
+      const rawText = chunk.toString('utf8');
+      const text = convertTimestampToLocal(rawText);
       this._appendLog(text);
       this.emit('log', { type: 'stdout', text });
-      checkLogForReady(text);
+      checkLogForReady(rawText);
     });
 
     this.process.stderr.on('data', (chunk) => {
-      const text = chunk.toString('utf8');
+      const rawText = chunk.toString('utf8');
+      const text = convertTimestampToLocal(rawText);
       this._appendLog(text);
       this.emit('log', { type: 'stderr', text });
     });
@@ -506,4 +533,5 @@ class ServerRunner extends EventEmitter {
 
 module.exports = {
   ServerRunner,
+  convertTimestampToLocal,
 };
