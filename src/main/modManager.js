@@ -126,10 +126,34 @@ class ModManager {
   }
 
   /**
+   * Ensure config.json Mods section only contains valid <group>:<name> identifiers
+   * and strips any malformed legacy keys that crash HytaleServer on startup.
+   */
+  async sanitizeServerConfig() {
+    try {
+      const cfg = await this.readServerConfig();
+      if (!cfg || !cfg.Mods || typeof cfg.Mods !== 'object') return;
+      let modified = false;
+      for (const key of Object.keys(cfg.Mods)) {
+        if (!key.includes(':')) {
+          delete cfg.Mods[key];
+          modified = true;
+        }
+      }
+      if (modified) {
+        await this.writeServerConfig(cfg);
+      }
+    } catch {
+      // Best effort
+    }
+  }
+
+  /**
    * Scan all mods in Server/mods directory
    */
   async getInstalledMods(checkRemoteUpdates = true) {
     await ensureDir(this.modsDir);
+    await this.sanitizeServerConfig();
     const meta = await this.loadMetadata();
     const serverCfg = await this.readServerConfig();
     const configMods = serverCfg.Mods || {};
@@ -157,8 +181,8 @@ class ModManager {
       // Read internal manifest.json
       const manifest = (await readModManifest(fullPath)) || {};
 
-      const modKey = manifest.Name || f.name.replace(/\.jar(\.disabled)?$/, '');
-      const isConfigDisabled = configMods[modKey]?.Enabled === false;
+      const modIdentifier = (manifest.Group && manifest.Name) ? `${manifest.Group}:${manifest.Name}` : null;
+      const isConfigDisabled = Boolean(modIdentifier && configMods[modIdentifier]?.Enabled === false);
       const isEnabled = !isFileDisabled && !isConfigDisabled;
 
       const savedMeta = meta.installedMods?.[f.name] || {};
@@ -312,15 +336,28 @@ class ModManager {
         }
       }
 
-      // Also update config.json Mods section for thoroughness
+      // Also update config.json Mods section safely if valid Group:Name exists
       try {
         const manifest = (await readModManifest(finalPath)) || {};
-        const modKey = manifest.Name || baseName.replace(/\.jar$/, '');
-        const cfg = await this.readServerConfig();
-        if (!cfg.Mods) cfg.Mods = {};
-        if (!cfg.Mods[modKey]) cfg.Mods[modKey] = {};
-        cfg.Mods[modKey].Enabled = enable;
-        await this.writeServerConfig(cfg);
+        if (manifest.Group && manifest.Name) {
+          const modKey = `${manifest.Group}:${manifest.Name}`;
+          const cfg = await this.readServerConfig();
+          if (!cfg.Mods) cfg.Mods = {};
+          if (enable) {
+            // DefaultModsEnabled: true in Hytale enables all .jar files by default.
+            // Removing from config.json keeps config.json clean and canonical.
+            delete cfg.Mods[modKey];
+          } else {
+            cfg.Mods[modKey] = { Enabled: false };
+          }
+          // Remove any malformed non-colon keys to prevent server crash
+          for (const k of Object.keys(cfg.Mods)) {
+            if (!k.includes(':')) delete cfg.Mods[k];
+          }
+          await this.writeServerConfig(cfg);
+        } else {
+          await this.sanitizeServerConfig();
+        }
       } catch {
         // Config update best effort
       }

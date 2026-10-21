@@ -254,7 +254,28 @@ async function run() {
   assert.strictEqual(formatGameVersionLabel('Early Access'), 'Early Access');
   console.log('  ✓ Strict version compatibility and 3-dot formatting verified');
 
-  console.log('\n🎉 ALL 16 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 17: Hytale PluginIdentifier Canonical Config Sanitization
+  console.log('Test 17: Hytale PluginIdentifier Config Sanitization');
+  const tempConfigDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'hytale_cfg_test_'));
+  const tempConfigPath = path.join(tempConfigDir, 'config.json');
+  await fsp.writeFile(tempConfigPath, JSON.stringify({
+    Version: 4,
+    Mods: {
+      'BetterMap': { Enabled: true },
+      'InvalidNameWithoutColon': { Enabled: false },
+      'valid.group:ValidName': { Enabled: true }
+    }
+  }, null, 2));
+  const testSanitizeManager = new ModManager({ serverDir: tempConfigDir });
+  await testSanitizeManager.sanitizeServerConfig();
+  const sanitizedCfg = await testSanitizeManager.readServerConfig();
+  assert.strictEqual('BetterMap' in sanitizedCfg.Mods, false);
+  assert.strictEqual('InvalidNameWithoutColon' in sanitizedCfg.Mods, false);
+  assert.strictEqual('valid.group:ValidName' in sanitizedCfg.Mods, true);
+  await fsp.rm(tempConfigDir, { recursive: true, force: true });
+  console.log('  ✓ Config sanitization stripped illegal non-namespaced keys cleanly');
+
+  console.log('\n🎉 ALL 17 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {
