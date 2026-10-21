@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld('api', {
   getInstalledMods: (checkUpdates) => ipcRenderer.invoke('mods:list', checkUpdates),
   setModEnabled: (fileName, enable) => ipcRenderer.invoke('mods:set-enabled', fileName, enable),
   deleteMod: (fileName, deleteConfig) => ipcRenderer.invoke('mods:delete', fileName, deleteConfig),
-  updateMod: (item) => ipcRenderer.invoke('mods:update', item),
+  updateMod: (item, options) => ipcRenderer.invoke('mods:update', item, options),
   onModActionProgress: (cb) => {
     const fn = (_, data) => cb(data);
     ipcRenderer.on('mods:action-progress', fn);

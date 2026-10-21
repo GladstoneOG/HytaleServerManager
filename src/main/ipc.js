@@ -206,9 +206,10 @@ function registerIpcHandlers({
     return await modManager.deleteMod(fileName, deleteConfigDir);
   });
 
-  ipcMain.handle('mods:update', async (_, item) => {
+  ipcMain.handle('mods:update', async (_, item, options = {}) => {
     try {
       const res = await modManager.updateMod(item, {
+        targetServerVersion: options.targetServerVersion,
         onProgress: (p) => win.webContents.send('mods:action-progress', p),
       });
       return { success: true, ...res };

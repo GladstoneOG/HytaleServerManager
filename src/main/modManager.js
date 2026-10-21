@@ -18,6 +18,47 @@ const { readEntryText, readModManifest } = require('./zip');
 const { readJson, writeJsonAtomic, exists, ensureDir, safeName, compareVersions } = require('./util');
 const { downloadFile } = require('./http');
 
+function selectBestCurseForgeFile(modObj, targetServerVersion = null, allowBeta = false) {
+  if (!modObj || !Array.isArray(modObj.latestFiles) || modObj.latestFiles.length === 0) {
+    return null;
+  }
+  const files = modObj.latestFiles;
+  const branch = targetServerVersion ? String(targetServerVersion).split('.').slice(0, 2).join('.') : null;
+
+  const isCompatible = (f) => {
+    if (!branch && !targetServerVersion) return true;
+    const gvs = f.gameVersions || [];
+    if (gvs.length === 0) return true;
+    return gvs.some((gv) => {
+      const gvClean = String(gv).trim();
+      return (
+        gvClean === targetServerVersion ||
+        gvClean === branch ||
+        gvClean === '*' ||
+        gvClean.toLowerCase() === 'early access' ||
+        (branch && gvClean.startsWith(branch))
+      );
+    });
+  };
+
+  // 1. Release file (releaseType === 1) that is compatible
+  const relCompatible = files.filter((f) => f.releaseType === 1 && isCompatible(f));
+  if (relCompatible.length > 0) return relCompatible[0];
+
+  // 2. Any Release file (releaseType === 1)
+  const anyRelease = files.filter((f) => f.releaseType === 1);
+  if (anyRelease.length > 0) return anyRelease[0];
+
+  // 3. If allowBeta is true (or mod has no release files at all), pick compatible then fallback
+  if (allowBeta) {
+    const betaCompatible = files.filter((f) => isCompatible(f));
+    if (betaCompatible.length > 0) return betaCompatible[0];
+  }
+
+  // 4. Fallback to newest available file
+  return files[0];
+}
+
 class ModManager {
   constructor({ serverDir = 'F:\\serverht\\Server', curseforgeClient, thunderstoreClient } = {}) {
     this.serverDir = serverDir;
@@ -25,6 +66,22 @@ class ModManager {
     this.ts = thunderstoreClient;
     this.metadataFile = path.join(this.serverDir, '.hytale_mod_manager.json');
     this.profilesDir = path.join(this.serverDir, '.mod_profiles');
+    this._actionLocks = new Map();
+  }
+
+  async _withLock(key, fn) {
+    while (this._actionLocks.has(key)) {
+      await this._actionLocks.get(key);
+    }
+    let resolver;
+    const p = new Promise((resolve) => { resolver = resolve; });
+    this._actionLocks.set(key, p);
+    try {
+      return await fn();
+    } finally {
+      this._actionLocks.delete(key);
+      resolver();
+    }
   }
 
   setServerDir(dir) {
@@ -220,61 +277,72 @@ class ModManager {
   }
 
   /**
-   * Enable or disable a mod
+   * Enable or disable a mod atomically and idempotently
    */
   async setModEnabled(fileName, enable) {
-    const filePath = path.join(this.modsDir, fileName);
-    let targetPath;
-    let newFileName;
+    const baseName = fileName.replace(/\.disabled$/, '');
+    return await this._withLock(baseName, async () => {
+      const enabledFile = baseName;
+      const disabledFile = `${baseName}.disabled`;
+      const enabledPath = path.join(this.modsDir, enabledFile);
+      const disabledPath = path.join(this.modsDir, disabledFile);
 
-    if (enable) {
-      if (fileName.endsWith('.disabled')) {
-        newFileName = fileName.replace(/\.disabled$/, '');
-        targetPath = path.join(this.modsDir, newFileName);
-        if (await exists(filePath)) {
-          await fsp.rename(filePath, targetPath);
+      const hasEnabled = await exists(enabledPath);
+      const hasDisabled = await exists(disabledPath);
+
+      let finalFile = enable ? enabledFile : disabledFile;
+      let finalPath = path.join(this.modsDir, finalFile);
+
+      if (enable) {
+        if (hasDisabled && !hasEnabled) {
+          await fsp.rename(disabledPath, enabledPath);
         }
       } else {
-        newFileName = fileName;
-        targetPath = filePath;
-      }
-    } else {
-      if (!fileName.endsWith('.disabled')) {
-        newFileName = `${fileName}.disabled`;
-        targetPath = path.join(this.modsDir, newFileName);
-        if (await exists(filePath)) {
-          await fsp.rename(filePath, targetPath);
+        if (hasEnabled && !hasDisabled) {
+          await fsp.rename(enabledPath, disabledPath);
         }
-      } else {
-        newFileName = fileName;
-        targetPath = filePath;
       }
-    }
 
-    // Also update config.json Mods section for thoroughness
-    try {
-      const manifest = (await readModManifest(targetPath)) || {};
-      const modKey = manifest.Name || newFileName.replace(/\.jar(\.disabled)?$/, '');
-      const cfg = await this.readServerConfig();
-      if (!cfg.Mods) cfg.Mods = {};
-      if (!cfg.Mods[modKey]) cfg.Mods[modKey] = {};
-      cfg.Mods[modKey].Enabled = enable;
-      await this.writeServerConfig(cfg);
-    } catch {
-      // Config update best effort
-    }
-
-    // Update metadata map key if renamed
-    const meta = await this.loadMetadata();
-    if (meta.installedMods && meta.installedMods[fileName]) {
-      meta.installedMods[newFileName] = meta.installedMods[fileName];
-      if (newFileName !== fileName) {
-        delete meta.installedMods[fileName];
+      // Verify the final file exists
+      if (!await exists(finalPath)) {
+        // Fallback: check if the original file still exists
+        const origPath = path.join(this.modsDir, fileName);
+        if (await exists(origPath)) {
+          finalFile = fileName;
+          finalPath = origPath;
+        }
       }
-      await this.saveMetadata(meta);
-    }
 
-    return { success: true, newFileName, isEnabled: enable };
+      // Also update config.json Mods section for thoroughness
+      try {
+        const manifest = (await readModManifest(finalPath)) || {};
+        const modKey = manifest.Name || baseName.replace(/\.jar$/, '');
+        const cfg = await this.readServerConfig();
+        if (!cfg.Mods) cfg.Mods = {};
+        if (!cfg.Mods[modKey]) cfg.Mods[modKey] = {};
+        cfg.Mods[modKey].Enabled = enable;
+        await this.writeServerConfig(cfg);
+      } catch {
+        // Config update best effort
+      }
+
+      // Update metadata map key if renamed
+      try {
+        const meta = await this.loadMetadata();
+        if (meta.installedMods) {
+          const prevKey = meta.installedMods[fileName] ? fileName : (meta.installedMods[enabledFile] ? enabledFile : disabledFile);
+          if (meta.installedMods[prevKey]) {
+            meta.installedMods[finalFile] = meta.installedMods[prevKey];
+            if (finalFile !== prevKey) {
+              delete meta.installedMods[prevKey];
+            }
+            await this.saveMetadata(meta);
+          }
+        }
+      } catch {}
+
+      return { success: true, newFileName: finalFile, isEnabled: enable };
+    });
   }
 
   /**
@@ -433,11 +501,11 @@ class ModManager {
   /**
    * Update an installed mod to its latest remote version
    */
-  async updateMod(item, { onProgress, signal } = {}) {
+  async updateMod(item, { onProgress, signal, targetServerVersion } = {}) {
     if (item.source === 'curseforge' && item.remoteId) {
       const modObj = await this.cf.getMod(item.remoteId);
-      const latestFile = item.latestRemoteFile || (modObj.latestFiles && modObj.latestFiles[0]);
-      if (!latestFile) throw new Error(`No latest file found for ${item.manifest.name}`);
+      const latestFile = item.latestRemoteFile || selectBestCurseForgeFile(modObj, targetServerVersion, false);
+      if (!latestFile) throw new Error(`No compatible release file found for ${item.manifest?.name || item.fileName}`);
 
       // Delete old jar
       await this.deleteMod(item.fileName, false);
@@ -659,4 +727,5 @@ class ModManager {
 
 module.exports = {
   ModManager,
+  selectBestCurseForgeFile,
 };

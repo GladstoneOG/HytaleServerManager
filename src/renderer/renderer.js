@@ -54,6 +54,7 @@ const btnDashLoginHytale = $('btn-dash-login-hytale');
 
 // Console
 const consoleStatusBadge = $('console-status-badge');
+const consoleLevelFilter = $('console-level-filter');
 const consoleLaunchMode = $('console-launch-mode');
 const btnClearConsole = $('btn-clear-console');
 const detachedModeNotice = $('detached-mode-notice');
@@ -62,6 +63,12 @@ const consoleOutput = $('console-output');
 const consoleJump = $('console-jump');
 const consoleInputForm = $('console-input-form');
 const consoleInput = $('console-input');
+
+// Mod Action Progress Dock
+const modActionDock = $('mod-action-dock');
+const modActionTitle = $('mod-action-title');
+const modActionStats = $('mod-action-stats');
+const modActionFill = $('mod-action-fill');
 
 // Library
 const modsSearchInput = $('mods-search-input');
@@ -91,7 +98,9 @@ const browseSortSelect = $('browse-sort-select');
 const browseAdvancedFilters = $('browse-advanced-filters');
 const cfCategoriesChips = $('cf-categories-chips');
 const btnClearCategories = $('btn-clear-categories');
-const browseUpdatedFilter = $('browse-updated-filter');
+const browseVersionFilter = $('browse-version-filter');
+const browseOnlyCompatible = $('browse-only-compatible');
+const filterServerVerTag = $('filter-server-ver-tag');
 const btnResetBrowseFilters = $('btn-reset-browse-filters');
 const browseCf = $('browse-cf');
 const cfResultsGrid = $('cf-results-grid');
@@ -193,6 +202,106 @@ let activeDeviceAuth = null;
 let commandHistory = [];
 let historyIndex = -1;
 let lastServerStatus = { isRunning: false, isDetached: false, pid: null };
+let currentServerVersion = '0.7.1';
+let modProgressHideTimer = null;
+
+function getCurrentServerVersion() {
+  return currentServerVersion || '0.7.1';
+}
+
+function compareVersions(v1, v2) {
+  const p1 = String(v1 || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const p2 = String(v2 || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(p1.length, p2.length);
+  for (let i = 0; i < len; i++) {
+    const a = p1[i] || 0;
+    const b = p2[i] || 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
+}
+
+function getModVersionInfo(mod) {
+  const currentVer = getCurrentServerVersion();
+  const currentBranch = currentVer.split('.').slice(0, 2).join('.');
+
+  const versions = new Set();
+  const files = mod.latestFiles || [];
+  const indexes = mod.latestFilesIndexes || [];
+
+  files.forEach((f) => {
+    (f.gameVersions || []).forEach((v) => versions.add(String(v).trim()));
+  });
+  indexes.forEach((idx) => {
+    if (idx.gameVersion) versions.add(String(idx.gameVersion).trim());
+  });
+
+  const versionList = Array.from(versions);
+  const semverList = versionList.filter((v) => /^\d+\.\d+/.test(v)).sort(compareVersions);
+
+  let displayRange = '0.7';
+  if (semverList.length === 1) {
+    displayRange = semverList[0];
+  } else if (semverList.length > 1) {
+    displayRange = `${semverList[0]} – ${semverList[semverList.length - 1]}`;
+  } else if (versionList.length > 0) {
+    displayRange = versionList.join(', ');
+  }
+
+  // Check compatibility against current server
+  const isCompatible = versionList.length === 0 || versionList.some((v) => {
+    const vc = v.toLowerCase();
+    return (
+      v === currentVer ||
+      v === currentBranch ||
+      v.startsWith(currentBranch) ||
+      v === '*' ||
+      vc === 'early access'
+    );
+  });
+
+  // Find best Release file (prioritize releaseType === 1 to avoid beta/alpha)
+  let bestFile = null;
+  bestFile = files.find((f) => f.releaseType === 1 && (f.gameVersions || []).some((v) => v === currentBranch || v === currentVer || v.startsWith(currentBranch)));
+  if (!bestFile) {
+    bestFile = files.find((f) => f.releaseType === 1);
+  }
+  if (!bestFile && files.length > 0) {
+    bestFile = files[0];
+  }
+
+  const isBeta = bestFile ? bestFile.releaseType === 2 : false;
+  const isAlpha = bestFile ? bestFile.releaseType === 3 : false;
+
+  return {
+    displayRange,
+    isCompatible,
+    bestFile,
+    isBeta,
+    isAlpha,
+    releaseType: bestFile?.releaseType || 1,
+    versions: versionList,
+  };
+}
+
+function showModProgress(title, percent, detail = '') {
+  if (!modActionDock) return;
+  clearTimeout(modProgressHideTimer);
+  modActionDock.classList.remove('hidden');
+  if (modActionTitle) modActionTitle.textContent = title;
+  if (modActionStats) modActionStats.textContent = detail || (typeof percent === 'number' ? `${percent}%` : '');
+  if (modActionFill && typeof percent === 'number') {
+    modActionFill.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+  }
+}
+
+function hideModProgress(delay = 1500) {
+  clearTimeout(modProgressHideTimer);
+  modProgressHideTimer = setTimeout(() => {
+    if (modActionDock) modActionDock.classList.add('hidden');
+  }, delay);
+}
 
 // ============================================================================
 // Utilities & Dialogs
@@ -590,6 +699,11 @@ async function checkServerVersion() {
 
     const res = await window.api.checkServerVersion(appConfig?.patchline || 'release');
 
+    if (res.installedVersion) {
+      currentServerVersion = res.installedVersion;
+      if (filterServerVerTag) filterServerVerTag.textContent = currentServerVersion;
+    }
+
     dashInstalledVer.textContent = res.installedVersion
       ? `v${res.installedVersion}`
       : res.installed
@@ -974,26 +1088,61 @@ function renderInstalledModsList() {
       updateBatchBarState(filtered);
     });
 
-    // Toggle mod
-    row.querySelector('.mod-toggle-cb').addEventListener('change', async (e) => {
+    // Toggle mod with anti-spam and atomic state tracking
+    const toggleCb = row.querySelector('.mod-toggle-cb');
+    toggleCb.addEventListener('change', async (e) => {
       const enable = e.target.checked;
+      toggleCb.disabled = true;
+      row.classList.toggle('is-disabled', !enable);
+
       try {
-        await window.api.setModEnabled(m.fileName, enable);
-        await loadInstalledMods(false);
+        const res = await window.api.setModEnabled(m.fileName, enable);
+        if (res && res.success) {
+          m.isEnabled = enable;
+          m.fileName = res.newFileName;
+          row.dataset.fileName = res.newFileName;
+          updateBatchBarState();
+          updateModsFilterCounts();
+        } else {
+          throw new Error(res?.error || 'Failed to toggle');
+        }
       } catch (err) {
         showToast(`Failed to toggle mod: ${err.message}`, 'error');
-        e.target.checked = !enable;
+        toggleCb.checked = !enable;
+        row.classList.toggle('is-disabled', enable);
+      } finally {
+        toggleCb.disabled = false;
       }
     });
 
-    // Update single mod
+    // Update single mod with version compatibility check
     const updateBtn = row.querySelector('.btn-update-mod');
     if (updateBtn) {
       updateBtn.addEventListener('click', async () => {
+        const currentVer = getCurrentServerVersion();
+        const currentBranch = currentVer.split('.').slice(0, 2).join('.');
+        const remoteFile = m.latestRemoteFile;
+
+        if (remoteFile && remoteFile.gameVersions && remoteFile.gameVersions.length > 0) {
+          const isComp = remoteFile.gameVersions.some((v) => {
+            const vc = String(v).trim().toLowerCase();
+            return v === currentVer || v === currentBranch || v.startsWith(currentBranch) || v === '*' || vc === 'early access';
+          });
+          if (!isComp) {
+            const ok = await confirmDialog({
+              title: '⚠️ Version Compatibility Warning',
+              message: `This update for "${m.manifest?.name || m.fileName}" is built for Hytale ${remoteFile.gameVersions.join(', ')}, but your server is running ${currentVer}. It may not work properly or cause crashes. Do you want to update anyway?`,
+              confirmLabel: 'Update anyway',
+              danger: true,
+            });
+            if (!ok) return;
+          }
+        }
+
         updateBtn.disabled = true;
         updateBtn.textContent = 'Updating…';
         try {
-          const res = await window.api.updateMod(m);
+          const res = await window.api.updateMod(m, { targetServerVersion: currentVer });
           if (res.success) {
             showToast(`Updated ${m.manifest?.name || m.fileName}`, 'success');
             await loadInstalledMods(true);
@@ -1135,15 +1284,25 @@ btnUpdateAllMods.addEventListener('click', async () => {
   if (toUpdate.length === 0) return;
 
   btnUpdateAllMods.disabled = true;
-  for (const m of toUpdate) {
+  const currentVer = getCurrentServerVersion();
+  let updatedCount = 0;
+
+  for (let i = 0; i < toUpdate.length; i++) {
+    const m = toUpdate[i];
+    const pct = Math.round((i / toUpdate.length) * 100);
+    showModProgress(`Updating mod ${i + 1} of ${toUpdate.length}: ${m.manifest?.name || m.fileName}`, pct, `${i + 1}/${toUpdate.length}`);
     try {
-      await window.api.updateMod(m);
+      await window.api.updateMod(m, { targetServerVersion: currentVer });
+      updatedCount++;
     } catch (e) {
-      showToast(`Failed ${m.manifest?.name}: ${e.message}`, 'error');
+      showToast(`Failed ${m.manifest?.name || m.fileName}: ${e.message}`, 'error');
     }
   }
+
+  showModProgress(`Updated ${updatedCount} mod(s)`, 100, 'Finished');
+  hideModProgress(1500);
   btnUpdateAllMods.disabled = false;
-  showToast(`Updated ${toUpdate.length} mod(s)`, 'success');
+  showToast(`Updated ${updatedCount} mod(s)`, 'success');
   await loadInstalledMods(true);
 });
 
@@ -1183,7 +1342,8 @@ btnClearCategories.addEventListener('click', () => {
 
 btnResetBrowseFilters.addEventListener('click', () => {
   selectedBrowseCategories.clear();
-  browseUpdatedFilter.value = 'all';
+  if (browseVersionFilter) browseVersionFilter.value = 'all';
+  if (browseOnlyCompatible) browseOnlyCompatible.checked = true;
   browseSortSelect.value = 'popular';
   renderCategoryChips();
   updateFiltersBadge();
@@ -1197,7 +1357,8 @@ btnResetBrowseFilters.addEventListener('click', () => {
 
 function updateFiltersBadge() {
   let count = selectedBrowseCategories.size;
-  if (browseUpdatedFilter.value !== 'all') count++;
+  if (browseVersionFilter && browseVersionFilter.value !== 'all' && browseVersionFilter.value !== 'compatible') count++;
+  if (browseOnlyCompatible && browseOnlyCompatible.checked) count++;
   if (browseSortSelect.value !== 'popular') count++;
 
   if (count > 0) {
@@ -1208,10 +1369,19 @@ function updateFiltersBadge() {
   }
 }
 
-browseUpdatedFilter.addEventListener('change', () => {
-  updateFiltersBadge();
-  applyBrowseFilters();
-});
+if (browseVersionFilter) {
+  browseVersionFilter.addEventListener('change', () => {
+    updateFiltersBadge();
+    applyBrowseFilters();
+  });
+}
+
+if (browseOnlyCompatible) {
+  browseOnlyCompatible.addEventListener('change', () => {
+    updateFiltersBadge();
+    applyBrowseFilters();
+  });
+}
 
 browseSortSelect.addEventListener('change', () => {
   updateFiltersBadge();
@@ -1327,17 +1497,20 @@ function renderCurseForgeFilteredResults() {
     });
   }
 
-  // 2. Last updated date filtering
-  const updatedFilter = browseUpdatedFilter.value;
-  if (updatedFilter !== 'all') {
-    const now = Date.now();
-    const daysMap = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
-    const maxAgeMs = (daysMap[updatedFilter] || 365) * 86400000;
-    mods = mods.filter((mod) => {
-      const modTime = mod.dateModified ? new Date(mod.dateModified).getTime() : 0;
-      return now - modTime <= maxAgeMs;
-    });
-  }
+  // 2. Version and compatibility filtering
+  const verFilter = browseVersionFilter ? browseVersionFilter.value : 'all';
+  const onlyComp = browseOnlyCompatible ? browseOnlyCompatible.checked : false;
+
+  mods = mods.filter((mod) => {
+    const verInfo = getModVersionInfo(mod);
+    if (onlyComp && !verInfo.isCompatible) return false;
+    if (verFilter === 'compatible' && !verInfo.isCompatible) return false;
+    if (verFilter === '0.7' && !verInfo.versions.some((v) => v.startsWith('0.7'))) return false;
+    if (verFilter === '0.6' && !verInfo.versions.some((v) => v.startsWith('0.6'))) return false;
+    if (verFilter === '0.5' && !verInfo.versions.some((v) => v.startsWith('0.5'))) return false;
+    if (verFilter === 'ea' && !verInfo.versions.some((v) => v.toLowerCase().includes('early access'))) return false;
+    return true;
+  });
 
   // 3. Client sorting
   const sort = browseSortSelect.value;
@@ -1350,7 +1523,7 @@ function renderCurseForgeFilteredResults() {
   }
 
   // FIX 3: Update page / results count accurately when filtered
-  const hasClientFilters = selectedBrowseCategories.size > 0 || browseUpdatedFilter.value !== 'all';
+  const hasClientFilters = selectedBrowseCategories.size > 0 || (browseVersionFilter && browseVersionFilter.value !== 'all') || (browseOnlyCompatible && browseOnlyCompatible.checked);
   if (hasClientFilters) {
     cfPageInfo.textContent = `${mods.length} mod${mods.length === 1 ? '' : 's'}`;
     cfPrevPage.disabled = true;
@@ -1365,7 +1538,7 @@ function renderCurseForgeFilteredResults() {
     cfResultsGrid.innerHTML = `
       <div class="empty">
         <div class="empty-title">No matching mods found</div>
-        <div class="empty-sub">Try expanding your category or date filter parameters.</div>
+        <div class="empty-sub">Try expanding your category or version filter parameters.</div>
       </div>`;
     return;
   }
@@ -1384,7 +1557,8 @@ function renderCurseForgeFilteredResults() {
 
     const authorName = (mod.authors || []).map((a) => a.name).join(', ') || 'Unknown';
     const downloads = formatNumber(mod.downloadCount);
-    const latestFile = mod.latestFiles?.[0] || null;
+    const verInfo = getModVersionInfo(mod);
+    const latestFile = verInfo.bestFile || mod.latestFiles?.[0] || null;
 
     const installedMatch = currentInstalledMods.find(
       (m) => m.remoteId === mod.id || (m.manifest?.name || '').toLowerCase() === (mod.name || '').toLowerCase()
@@ -1409,10 +1583,14 @@ function renderCurseForgeFilteredResults() {
       </div>
       <div class="mod-card-desc">${escapeHtml(mod.summary || 'No description provided.')}</div>
       <div class="mod-card-foot">
-        <span class="mod-card-stat">
-          <svg class="ic"><use href="#i-download"/></svg>
-          <span>${downloads}</span>
-        </span>
+        <div class="mod-card-stats-wrap" style="display: flex; align-items: center; gap: 8px;">
+          <span class="mod-card-stat">
+            <svg class="ic"><use href="#i-download"/></svg>
+            <span>${downloads}</span>
+          </span>
+          <span class="badge-version ${verInfo.isCompatible ? 'is-compatible' : 'is-mismatch'}" title="Target version: ${escapeHtml(verInfo.displayRange)}">${escapeHtml(verInfo.displayRange)}</span>
+          ${verInfo.isBeta ? '<span class="badge-beta">Beta</span>' : (verInfo.isAlpha ? '<span class="badge-beta">Alpha</span>' : '')}
+        </div>
         <button class="btn ${btnClass} btn-sm btn-cf-install" ${canInstall ? '' : 'disabled'}>${btnLabel}</button>
       </div>
     `;
@@ -1430,6 +1608,26 @@ function renderCurseForgeFilteredResults() {
           showToast('No downloadable file found for this mod', 'error');
           return;
         }
+
+        const currentVer = getCurrentServerVersion();
+        if (!verInfo.isCompatible) {
+          const ok = await confirmDialog({
+            title: '⚠️ Version Incompatibility Warning',
+            message: `"${mod.name}" was built for Hytale ${verInfo.displayRange}, but your server is running ${currentVer}. Running incompatible mods may cause the server to crash. Do you want to install it anyway?`,
+            confirmLabel: 'Install anyway',
+            danger: true,
+          });
+          if (!ok) return;
+        } else if (verInfo.isBeta || verInfo.isAlpha) {
+          const ok = await confirmDialog({
+            title: `⚠️ ${verInfo.isAlpha ? 'Alpha' : 'Beta'} Mod Warning`,
+            message: `"${mod.name}" is marked as a ${verInfo.isAlpha ? 'pre-alpha' : 'beta'} preview build and may contain bugs. Do you want to continue?`,
+            confirmLabel: 'Install build',
+            danger: false,
+          });
+          if (!ok) return;
+        }
+
         installBtn.disabled = true;
         installBtn.textContent = 'Installing…';
         try {
@@ -1490,18 +1688,6 @@ async function loadThunderstoreMods() {
 
 function renderThunderstoreFilteredResults() {
   let pkgs = [...rawThunderstoreModsCache];
-
-  // Date filtering
-  const updatedFilter = browseUpdatedFilter.value;
-  if (updatedFilter !== 'all') {
-    const now = Date.now();
-    const daysMap = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
-    const maxAgeMs = (daysMap[updatedFilter] || 365) * 86400000;
-    pkgs = pkgs.filter((pkg) => {
-      const pkgTime = pkg.date_modified ? new Date(pkg.date_modified).getTime() : 0;
-      return now - pkgTime <= maxAgeMs;
-    });
-  }
 
   // Sort
   const sort = browseSortSelect.value;
@@ -1596,7 +1782,10 @@ function renderThunderstoreFilteredResults() {
 async function openModModal(mod, latestFile) {
   modalModTitle.textContent = mod.name;
   const authorName = (mod.authors || []).map((a) => a.name).join(', ') || 'Unknown';
-  modalModMeta.textContent = `by ${authorName} · ${formatNumber(mod.downloadCount)} downloads`;
+  const verInfo = getModVersionInfo(mod);
+  const targetFile = verInfo.bestFile || latestFile;
+
+  modalModMeta.innerHTML = `by ${escapeHtml(authorName)} · ${formatNumber(mod.downloadCount)} downloads · <span class="badge-version ${verInfo.isCompatible ? 'is-compatible' : 'is-mismatch'}">Hytale ${escapeHtml(verInfo.displayRange)}</span>${verInfo.isBeta ? ' <span class="badge-beta">Beta</span>' : (verInfo.isAlpha ? ' <span class="badge-beta">Alpha</span>' : '')}`;
   modalModAvatar.innerHTML = mod.logo?.thumbnailUrl
     ? `<img src="${escapeHtml(mod.logo.thumbnailUrl)}" alt="">`
     : escapeHtml((mod.name || 'M').charAt(0).toUpperCase());
@@ -1606,17 +1795,37 @@ async function openModModal(mod, latestFile) {
 
   modalModFooter.innerHTML = `
     <button class="btn btn-ghost" id="modal-close-action">Close</button>
-    <button class="btn btn-primary" id="modal-install-action" ${latestFile ? '' : 'disabled'}>Install</button>
+    <button class="btn btn-primary" id="modal-install-action" ${targetFile ? '' : 'disabled'}>Install</button>
   `;
 
   $('modal-close-action').addEventListener('click', () => modModal.classList.add('hidden'));
   $('modal-install-action').addEventListener('click', async (e) => {
-    if (!latestFile) return;
+    if (!targetFile) return;
+
+    const currentVer = getCurrentServerVersion();
+    if (!verInfo.isCompatible) {
+      const ok = await confirmDialog({
+        title: '⚠️ Version Incompatibility Warning',
+        message: `"${mod.name}" was built for Hytale ${verInfo.displayRange}, but your server is running ${currentVer}. Running incompatible mods may cause the server to crash. Do you want to install it anyway?`,
+        confirmLabel: 'Install anyway',
+        danger: true,
+      });
+      if (!ok) return;
+    } else if (verInfo.isBeta || verInfo.isAlpha) {
+      const ok = await confirmDialog({
+        title: `⚠️ ${verInfo.isAlpha ? 'Alpha' : 'Beta'} Mod Warning`,
+        message: `"${mod.name}" is marked as a ${verInfo.isAlpha ? 'pre-alpha' : 'beta'} preview build and may contain bugs. Do you want to continue?`,
+        confirmLabel: 'Install build',
+        danger: false,
+      });
+      if (!ok) return;
+    }
+
     const btn = e.currentTarget;
     btn.disabled = true;
     btn.textContent = 'Installing…';
     try {
-      const res = await window.api.installCfMod(mod, latestFile, true);
+      const res = await window.api.installCfMod(mod, targetFile, true);
       if (res.success) {
         showToast(`Installed ${mod.name}`, 'success');
         modModal.classList.add('hidden');
@@ -1894,6 +2103,14 @@ function queueLogLine(entry) {
   }
 }
 
+function detectLogLevel(entry) {
+  const text = entry.text || '';
+  if (entry.type === 'stderr' || entry.type === 'error') return 'error';
+  if (/\b(ERROR|SEVERE|FATAL|Exception|Error:)\b/i.test(text)) return 'error';
+  if (/\b(WARN|WARNING)\b/i.test(text)) return 'warn';
+  return 'info';
+}
+
 function flushLogLines() {
   logFlushScheduled = false;
   if (pendingLogLines.length === 0) return;
@@ -1901,7 +2118,9 @@ function flushLogLines() {
   const frag = document.createDocumentFragment();
   for (const entry of pendingLogLines) {
     const line = document.createElement('div');
-    line.className = `log-line ${entry.type || ''}`;
+    const level = detectLogLevel(entry);
+    line.className = `log-line ${entry.type || ''} log-${level}`;
+    line.dataset.level = level;
     line.textContent = entry.text;
     frag.appendChild(line);
   }
@@ -1916,6 +2135,39 @@ function flushLogLines() {
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
   }
 }
+
+if (consoleLevelFilter) {
+  bindSegmentedControl(consoleLevelFilter, (val) => {
+    consoleOutput.dataset.logFilter = val;
+    if (stickToBottom) {
+      consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    }
+  });
+}
+
+window.api.onModActionProgress((p) => {
+  if (!p) return;
+  const modName = p.modName || p.fileName || 'Mod';
+  let pct = 0;
+  if (p.total && p.done) {
+    pct = Math.min(100, Math.round((p.done / p.total) * 100));
+  } else if (typeof p.percent === 'number') {
+    pct = p.percent;
+  }
+
+  if (p.step === 'downloading') {
+    const speedText = p.speed ? ` • ${(p.speed / 1024).toFixed(0)} KB/s` : '';
+    const sizeText = p.total && p.done ? `${(p.done / 1048576).toFixed(1)} MB / ${(p.total / 1048576).toFixed(1)} MB` : `${pct}%`;
+    showModProgress(p.message || `Downloading ${modName}...`, pct, `${sizeText}${speedText}`);
+  } else if (p.step === 'dependencies') {
+    showModProgress(p.message || `Resolving dependencies...`, 50, 'Dependencies');
+  } else if (p.step === 'extracting' || p.step === 'installing') {
+    showModProgress(p.message || `Installing ${modName}...`, 85, 'Extracting');
+  } else if (p.step === 'complete' || p.step === 'done') {
+    showModProgress(p.message || `Completed!`, 100, 'Done');
+    hideModProgress(1500);
+  }
+});
 
 window.api.onServerLog((entry) => queueLogLine(entry));
 window.api.onServerStatusChange((status) => updateServerStatusUI(status));

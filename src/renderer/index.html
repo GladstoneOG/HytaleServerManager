@@ -106,6 +106,22 @@
         </div>
       </header>
 
+      <!-- Active Mod Download / Update Progress Dock -->
+      <div id="mod-action-dock" class="mod-action-dock hidden" role="status" aria-live="polite">
+        <div class="mod-action-dock-inner">
+          <div class="mod-action-row">
+            <div class="mod-action-label">
+              <span class="spinner-sm"></span>
+              <span id="mod-action-title">Updating mod...</span>
+            </div>
+            <div id="mod-action-stats" class="mod-action-stats mono">0%</div>
+          </div>
+          <div class="progress-track">
+            <div id="mod-action-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="content">
         <!-- ============================ OVERVIEW ============================ -->
         <section id="tab-overview" class="page active" aria-label="Overview">
@@ -218,6 +234,12 @@
                 <span id="console-status-badge" class="tag">Offline</span>
               </div>
               <div class="terminal-tools">
+                <div class="segmented segmented-sm" id="console-level-filter" role="radiogroup" aria-label="Log filter">
+                  <button data-value="all" class="active" role="radio" title="Show all messages">All</button>
+                  <button data-value="warn-error" role="radio" title="Show warnings and errors">Warn & Error</button>
+                  <button data-value="warn" role="radio" title="Show warnings only">Warn</button>
+                  <button data-value="error" role="radio" title="Show errors only">Error</button>
+                </div>
                 <div class="segmented segmented-sm" id="console-launch-mode" role="radiogroup" aria-label="Run mode">
                   <button data-value="integrated" role="radio" title="Logs and commands inside this app">In app</button>
                   <button data-value="detached" role="radio" title="Opens its own window — you can close this app safely">Separate window</button>
@@ -352,14 +374,19 @@
                 </div>
                 <div class="filters-col">
                   <label class="filters-field">
-                    <span class="filters-label">Last updated</span>
-                    <select id="browse-updated-filter" class="select">
-                      <option value="all">Any time</option>
-                      <option value="7d">Past 7 days</option>
-                      <option value="30d">Past 30 days</option>
-                      <option value="90d">Past 3 months</option>
-                      <option value="1y">Past year</option>
+                    <span class="filters-label">Game version</span>
+                    <select id="browse-version-filter" class="select">
+                      <option value="all">All versions</option>
+                      <option value="compatible" selected>Compatible with server</option>
+                      <option value="0.7">0.7.x</option>
+                      <option value="0.6">0.6.x</option>
+                      <option value="0.5">0.5.x</option>
+                      <option value="ea">Early Access</option>
                     </select>
+                  </label>
+                  <label class="check-label" id="browse-compatible-label" title="Only display mods compatible with currently selected server version">
+                    <input type="checkbox" id="browse-only-compatible" checked>
+                    <span>Only compatible (<span id="filter-server-ver-tag">-</span>)</span>
                   </label>
                   <button id="btn-reset-browse-filters" class="btn btn-ghost btn-sm">Reset all filters</button>
                 </div>

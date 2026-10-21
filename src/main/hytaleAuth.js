@@ -11,6 +11,7 @@ const path = require('path');
 const fsp = require('fs/promises');
 const { getJson, postForm, postJson, request } = require('./http');
 const { readJson, writeJsonAtomic, exists, sleep } = require('./util');
+const { loadSecureCredentials, saveSecureCredentials } = require('./secureStorage');
 
 const OAUTH_BASE = 'https://oauth.accounts.hytale.com';
 const ASSETS_BASE = 'https://account-data.hytale.com';
@@ -32,7 +33,7 @@ class HytaleAuthManager {
   }
 
   /**
-   * Find .hytale-downloader-credentials.json in server directory or parent directories
+   * Find .hytale-downloader-credentials.enc or legacy .json in server directory or parent directories
    */
   async findCredentialsFile() {
     if (this.credentialsPath && await exists(this.credentialsPath)) {
@@ -41,11 +42,15 @@ class HytaleAuthManager {
 
     const candidates = [];
     if (this.serverDir) {
+      candidates.push(path.join(this.serverDir, '.hytale-downloader-credentials.enc'));
+      candidates.push(path.join(path.dirname(this.serverDir), '.hytale-downloader-credentials.enc'));
+      candidates.push(path.join(path.dirname(path.dirname(this.serverDir)), '.hytale-downloader-credentials.enc'));
       candidates.push(path.join(this.serverDir, '.hytale-downloader-credentials.json'));
       candidates.push(path.join(path.dirname(this.serverDir), '.hytale-downloader-credentials.json'));
       candidates.push(path.join(path.dirname(path.dirname(this.serverDir)), '.hytale-downloader-credentials.json'));
     }
     // Also check standard F:\serverht
+    candidates.push('F:\\serverht\\.hytale-downloader-credentials.enc');
     candidates.push('F:\\serverht\\.hytale-downloader-credentials.json');
 
     for (const c of candidates) {
@@ -58,7 +63,7 @@ class HytaleAuthManager {
   }
 
   /**
-   * Load credentials from file
+   * Load credentials securely from encrypted file or legacy plaintext
    */
   async loadCredentials(force = false) {
     if (this._credentials && !force) return this._credentials;
@@ -70,8 +75,14 @@ class HytaleAuthManager {
     }
 
     try {
-      this._credentials = await readJson(file);
-      return this._credentials;
+      const res = await loadSecureCredentials(file);
+      if (res && res.credentials) {
+        this._credentials = res.credentials;
+        this.credentialsPath = res.filePath;
+        return this._credentials;
+      }
+      this._credentials = null;
+      return null;
     } catch {
       this._credentials = null;
       return null;
@@ -79,20 +90,20 @@ class HytaleAuthManager {
   }
 
   /**
-   * Save credentials to file
+   * Save credentials securely as an encrypted file
    */
   async saveCredentials(creds) {
     let file = await this.findCredentialsFile();
     if (!file) {
       // Default to server parent directory or server directory
       const baseDir = this.serverDir ? path.dirname(this.serverDir) : 'F:\\serverht';
-      file = path.join(baseDir, '.hytale-downloader-credentials.json');
-      this.credentialsPath = file;
+      file = path.join(baseDir, '.hytale-downloader-credentials.enc');
     }
 
-    await writeJsonAtomic(file, creds);
+    const savedPath = await saveSecureCredentials(file, creds);
+    this.credentialsPath = savedPath;
     this._credentials = creds;
-    return file;
+    return savedPath;
   }
 
   /**

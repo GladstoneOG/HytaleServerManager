@@ -32,9 +32,9 @@ yarn-error.log*
 
 # CRITICAL: Credentials, Tokens & Secrets (NEVER COMMIT)
 .hytale-downloader-credentials.json
-*credentials*
-*token*
-*secret*
+.hytale-downloader-credentials.enc
+*credentials*.json
+*credentials*.enc
 auth.enc
 *.env
 *.env.*

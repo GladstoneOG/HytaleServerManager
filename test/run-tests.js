@@ -159,7 +159,63 @@ async function run() {
     } catch {}
   }
 
-  console.log('\n🎉 ALL 12 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 13: Secure Encrypted Credential Store
+  console.log('Test 13: Secure Encrypted Credential Store');
+  const { encryptData, decryptData, saveSecureCredentials, loadSecureCredentials } = require('../src/main/secureStorage');
+  const sampleCreds = { access_token: 'secret_abc_123', refresh_token: 'refresh_xyz_789', username: 'TestPlayer' };
+  const tempCredEnc = path.join(os.tmpdir(), `hytale_test_cred_${Date.now()}.enc`);
+  try {
+    await saveSecureCredentials(tempCredEnc, sampleCreds);
+    const rawFileContent = await fsp.readFile(tempCredEnc);
+    // Plaintext secret must not appear anywhere unencrypted in the file
+    assert.strictEqual(rawFileContent.includes('secret_abc_123'), false);
+    const loaded = await loadSecureCredentials(tempCredEnc);
+    assert.strictEqual(loaded.credentials.access_token, 'secret_abc_123');
+    assert.strictEqual(loaded.credentials.username, 'TestPlayer');
+    console.log('  ✓ Encrypted credentials verified: zero plaintext on disk & decrypted cleanly');
+  } finally {
+    try { await fsp.unlink(tempCredEnc); } catch {}
+  }
+
+  // Test 14: Mod Manager Atomic Toggling & Anti-Spam
+  console.log('Test 14: Mod Manager Atomic Toggling & Anti-Spam');
+  const testModMan = new ModManager({ serverDir: 'F:\\serverht\\Server' });
+  const installedMods = await testModMan.getInstalledMods(false);
+  if (installedMods.length > 0) {
+    const testTarget = installedMods[0];
+    const initialEnabled = testTarget.isEnabled;
+    // Spam 4 concurrent toggle requests in parallel
+    const spamResults = await Promise.all([
+      testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
+      testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
+      testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
+      testModMan.setModEnabled(testTarget.fileName, !initialEnabled),
+    ]);
+    assert.strictEqual(spamResults.every((r) => r.success), true);
+    // Restore back to original state
+    await testModMan.setModEnabled(spamResults[0].newFileName, initialEnabled);
+    console.log('  ✓ Concurrent duplicate toggle calls executed cleanly without race conditions');
+  }
+
+  // Test 15: CurseForge Release vs Beta File Selection & Compatibility
+  console.log('Test 15: CurseForge Release vs Beta Selection & Compatibility');
+  const { selectBestCurseForgeFile } = require('../src/main/modManager');
+  const mockMod = {
+    name: 'MockMod',
+    latestFiles: [
+      { id: 999, fileName: 'Mock-beta-0.7.jar', releaseType: 2, gameVersions: ['0.7'] },
+      { id: 888, fileName: 'Mock-release-0.7.jar', releaseType: 1, gameVersions: ['0.7'] },
+      { id: 777, fileName: 'Mock-release-0.6.jar', releaseType: 1, gameVersions: ['0.6'] },
+    ],
+  };
+  // Should select Release 1 over Beta 2 even if Beta has higher id
+  const selected = selectBestCurseForgeFile(mockMod, '0.7.1', false);
+  assert.strictEqual(selected.id, 888);
+  assert.strictEqual(selected.releaseType, 1);
+  assert.strictEqual(selected.fileName, 'Mock-release-0.7.jar');
+  console.log('  ✓ Correctly selected compatible Release build (avoided Beta build)');
+
+  console.log('\n🎉 ALL 15 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {
