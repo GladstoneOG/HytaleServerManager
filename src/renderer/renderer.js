@@ -241,6 +241,40 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
+function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer) {
+  if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all') return true;
+  if (!currentServerVer) return true;
+
+  const curClean = String(currentServerVer).trim();
+  const curBranch = curClean.split('.').slice(0, 2).join('.'); // e.g. '0.7'
+  const spec = String(serverVerSpec).trim();
+
+  // Handle range like ">=0.6.7 <0.8.0"
+  if (spec.includes('<') || spec.includes('>')) {
+    const parts = spec.split(/\s+/);
+    let passes = true;
+    for (const p of parts) {
+      if (p.startsWith('>=')) {
+        if (compareVersions(curClean, p.slice(2)) < 0) passes = false;
+      } else if (p.startsWith('>')) {
+        if (compareVersions(curClean, p.slice(1)) <= 0) passes = false;
+      } else if (p.startsWith('<=')) {
+        if (compareVersions(curClean, p.slice(2)) > 0) passes = false;
+      } else if (p.startsWith('<')) {
+        if (compareVersions(curClean, p.slice(1)) >= 0) passes = false;
+      }
+    }
+    return passes;
+  }
+
+  // Exact match or branch match
+  if (spec === curClean) return true;
+  if (spec === curBranch || spec.startsWith(curBranch + '.') || spec.startsWith(curBranch + 'x')) return true;
+  if (curBranch.toLowerCase() === 'early access' && spec.toLowerCase() === 'early access') return true;
+
+  return false;
+}
+
 function getModVersionInfo(mod) {
   const currentVer = getCurrentServerVersion();
   const currentBranch = currentVer ? currentVer.split('.').slice(0, 2).join('.') : '0.7';
@@ -1083,6 +1117,13 @@ function renderInstalledModsList() {
         ? '<span class="tag tag-info">Thunderstore</span>'
         : '<span class="tag">Local</span>';
 
+    const currentVer = getCurrentServerVersion();
+    const serverVerSpec = m.manifest?.serverVersion;
+    const isComp = isModVersionCompatibleWithServer(serverVerSpec, currentVer);
+    const compatTag = (!isComp && serverVerSpec && serverVerSpec !== '*')
+      ? `<span class="tag tag-danger" title="This mod was built for Hytale ${escapeHtml(formatGameVersionLabel(serverVerSpec))}, but your server is running ${escapeHtml(currentVer)}.">⚠️ Hytale ${escapeHtml(formatGameVersionLabel(serverVerSpec))}</span>`
+      : '';
+
     const updateTag = m.updateAvailable ? '<span class="tag tag-success">Update available</span>' : '';
     const authors = (m.manifest?.authors || []).map((a) => (typeof a === 'string' ? a : a.Name)).filter(Boolean).join(', ');
 
@@ -1110,6 +1151,7 @@ function renderInstalledModsList() {
           <span class="mod-row-name">${escapeHtml(m.manifest?.name || m.fileName)}</span>
           <span class="mod-row-ver">v${escapeHtml(m.manifest?.version || '1.0.0')}</span>
           ${sourceTag}
+          ${compatTag}
           ${updateTag}
         </div>
         ${m.manifest?.description ? `<div class="mod-row-desc">${escapeHtml(m.manifest.description)}</div>` : ''}

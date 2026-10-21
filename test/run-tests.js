@@ -343,7 +343,29 @@ async function run() {
   await fsp.rm(tempRestoreDir, { recursive: true, force: true });
   console.log('  ✓ Restore point snapshot created, verified, and restored cleanly');
 
-  console.log('\n🎉 ALL 18 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 19: Dual JAR and ZIP Mod Format Recognition & Compatibility Parsing
+  console.log('Test 19: Dual JAR and ZIP Format Recognition & Compatibility');
+  const tempZipModDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'hytale_zip_test_'));
+  const tempZipModsFolder = path.join(tempZipModDir, 'mods');
+  await fsp.mkdir(tempZipModsFolder, { recursive: true });
+  await fsp.writeFile(path.join(tempZipModsFolder, 'PluginMod.jar'), 'PK\x05\x06' + '\x00'.repeat(18));
+  await fsp.writeFile(path.join(tempZipModsFolder, 'ContentPack.zip'), 'PK\x05\x06' + '\x00'.repeat(18));
+  await fsp.writeFile(path.join(tempZipModsFolder, 'DisabledPack.zip.disabled'), 'PK\x05\x06' + '\x00'.repeat(18));
+
+  const zipModMan = new ModManager({ serverDir: tempZipModDir });
+  const scanned = await zipModMan.getInstalledMods(false);
+  assert.strictEqual(scanned.length, 3);
+  const foundJar = scanned.find((m) => m.fileName === 'PluginMod.jar');
+  const foundZip = scanned.find((m) => m.fileName === 'ContentPack.zip');
+  const foundDisabledZip = scanned.find((m) => m.fileName === 'DisabledPack.zip.disabled');
+  assert(foundJar !== undefined);
+  assert(foundZip !== undefined && foundZip.isEnabled === true);
+  assert(foundDisabledZip !== undefined && foundDisabledZip.isEnabled === false);
+
+  await fsp.rm(tempZipModDir, { recursive: true, force: true });
+  console.log('  ✓ Verified both .jar and .zip mods are accurately detected and managed');
+
+  console.log('\n🎉 ALL 19 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

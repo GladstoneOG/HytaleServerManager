@@ -186,14 +186,19 @@ class ModManager {
       return [];
     }
 
-    const jarFiles = files.filter(
-      (f) => f.isFile() && (f.name.endsWith('.jar') || f.name.endsWith('.jar.disabled'))
+    const modFiles = files.filter(
+      (f) =>
+        f.isFile() &&
+        (f.name.endsWith('.jar') ||
+          f.name.endsWith('.jar.disabled') ||
+          f.name.endsWith('.zip') ||
+          f.name.endsWith('.zip.disabled'))
     );
 
     const installed = [];
     const filesToFingerprint = [];
 
-    for (const f of jarFiles) {
+    for (const f of modFiles) {
       const fullPath = path.join(this.modsDir, f.name);
       const isFileDisabled = f.name.endsWith('.disabled');
       let stat;
@@ -215,7 +220,7 @@ class ModManager {
         lastModified: stat.mtimeMs,
         isEnabled,
         manifest: {
-          name: manifest.Name || f.name.replace(/\.jar(\.disabled)?$/, ''),
+          name: manifest.Name || f.name.replace(/\.(jar|zip)(\.disabled)?$/, ''),
           version: manifest.Version || 'Unknown',
           description: manifest.Description || '',
           authors: manifest.Authors || [],

@@ -803,6 +803,10 @@ summary,
   background: var(--info-soft);
   color: #7dd3fc;
 }
+.tag-danger {
+  background: var(--danger-soft);
+  color: #f87171;
+}
 
 /* ============================================================================
    Overview: Callout, Hero, Stats, Cards
