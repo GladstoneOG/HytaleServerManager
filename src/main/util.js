@@ -126,7 +126,10 @@ function checkSingleClause(clause, currentServerVer) {
   const curClean = cleanVerNum(currentServerVer);
   const curBranch = curClean.split('.').slice(0, 2).join('.');
 
-  const tokens = clause.trim().split(/\s+/).filter(Boolean);
+  const trimmed = clause.trim();
+  if (trimmed.toLowerCase() === 'early access') return true;
+
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return true;
 
   for (const rawToken of tokens) {
@@ -182,7 +185,7 @@ function checkSingleClause(clause, currentServerVer) {
     const cleanToken = cleanVerNum(token);
     if (cleanToken === curClean) continue;
     if (token === curBranch || token.startsWith(curBranch + '.') || token.startsWith(curBranch + 'x')) continue;
-    if (token.toLowerCase() === 'early access' && curBranch.toLowerCase() === 'early access') continue;
+    if (token.toLowerCase() === 'early access') continue;
 
     return false;
   }
@@ -203,7 +206,7 @@ function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remot
       if (gvClean === '*' || gvLower === 'all') return true;
       if (gvClean === curClean) return true;
       if (gvClean === curBranch || gvClean.startsWith(curBranch + '.') || gvClean.startsWith(curBranch + 'x')) return true;
-      if (gvLower === 'early access' && curBranch.toLowerCase() === 'early access') return true;
+      if (gvLower === 'early access') return true;
       return false;
     });
     // If the platform specifically designates this file for other game version(s) (e.g. 0.6),
@@ -214,7 +217,7 @@ function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remot
   }
 
   // 2. Internal manifest.json specification
-  if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all') return true;
+  if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all' || serverVerSpec.toLowerCase() === 'early access') return true;
 
   const spec = String(serverVerSpec).trim();
   if (isDateOrBuildTag(spec)) return true;

@@ -258,7 +258,10 @@ function checkSingleClause(clause, currentServerVer) {
   const curClean = cleanVerNum(currentServerVer);
   const curBranch = curClean.split('.').slice(0, 2).join('.'); // '0.7'
 
-  const tokens = clause.trim().split(/\s+/).filter(Boolean);
+  const trimmed = clause.trim();
+  if (trimmed.toLowerCase() === 'early access') return true;
+
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return true;
 
   for (const rawToken of tokens) {
@@ -314,7 +317,7 @@ function checkSingleClause(clause, currentServerVer) {
     const cleanToken = cleanVerNum(token);
     if (cleanToken === curClean) continue;
     if (token === curBranch || token.startsWith(curBranch + '.') || token.startsWith(curBranch + 'x')) continue;
-    if (token.toLowerCase() === 'early access' && curBranch.toLowerCase() === 'early access') continue;
+    if (token.toLowerCase() === 'early access') continue;
 
     // Direct mismatch
     return false;
@@ -336,7 +339,7 @@ function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remot
       if (gvClean === '*' || gvLower === 'all') return true;
       if (gvClean === curClean) return true;
       if (gvClean === curBranch || gvClean.startsWith(curBranch + '.') || gvClean.startsWith(curBranch + 'x')) return true;
-      if (gvLower === 'early access' && curBranch.toLowerCase() === 'early access') return true;
+      if (gvLower === 'early access') return true;
       return false;
     });
     // If platform specifies target game versions and none match the server branch, it is NOT compatible
@@ -346,7 +349,7 @@ function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remot
   }
 
   // 2. Internal manifest.json specification
-  if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all') return true;
+  if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all' || serverVerSpec.toLowerCase() === 'early access') return true;
 
   const spec = String(serverVerSpec).trim();
   if (isDateOrBuildTag(spec)) return true;
@@ -389,7 +392,7 @@ function getModVersionInfo(mod) {
     if (vc === '*' || vLower === 'all') return true;
     if (vc === currentVer) return true;
     if (currentBranch && (vc === currentBranch || vc.startsWith(currentBranch + '.') || vc.startsWith(currentBranch + 'x'))) return true;
-    if (currentBranch.toLowerCase() === 'early access' && vLower === 'early access') return true;
+    if (vLower === 'early access') return true;
     return false;
   });
 
@@ -403,7 +406,7 @@ function getModVersionInfo(mod) {
       if (vc === '*' || vLower === 'all') return true;
       if (vc === currentVer) return true;
       if (currentBranch && (vc === currentBranch || vc.startsWith(currentBranch + '.') || vc.startsWith(currentBranch + 'x'))) return true;
-      if (currentBranch.toLowerCase() === 'early access' && vLower === 'early access') return true;
+      if (vLower === 'early access') return true;
       return false;
     });
   };
@@ -1230,6 +1233,17 @@ function renderInstalledModsList() {
       ? m.gameVersions
       : (m.latestRemoteFile?.gameVersions || []);
 
+    const isEarlyAccess =
+      (Array.isArray(remoteGVs) && remoteGVs.some((v) => String(v).trim().toLowerCase() === 'early access')) ||
+      (serverVerSpec && String(serverVerSpec).trim().toLowerCase() === 'early access');
+
+    const curClean = cleanVerNum(currentVer);
+    const curBranch = curClean.split('.').slice(0, 2).join('.');
+    const hasBranchMatch = Array.isArray(remoteGVs) && remoteGVs.some((v) => {
+      const vc = String(v).trim();
+      return vc === '*' || vc.toLowerCase() === 'all' || vc === currentVer || vc === curClean || vc === curBranch || vc.startsWith(curBranch + '.') || vc.startsWith(curBranch + 'x');
+    });
+
     const isComp = isModVersionCompatibleWithServer(serverVerSpec, currentVer, remoteGVs);
     let compatTag = '';
     if (!isComp) {
@@ -1244,6 +1258,8 @@ function renderInstalledModsList() {
         ? `This mod was built for Hytale ${escapeHtml(targetVerLabel)}, but your server is running ${escapeHtml(currentVer)}.`
         : `This mod is incompatible with server version ${escapeHtml(currentVer)}.`;
       compatTag = `<span class="tag tag-danger" title="${tooltipText}">${labelText}</span>`;
+    } else if (isEarlyAccess && !hasBranchMatch) {
+      compatTag = `<span class="tag tag-early-access" title="This mod was released during Early Access. Compatibility with Hytale ${escapeHtml(currentVer)} is unverified.">Early Access</span>`;
     }
 
     const updateTag = m.updateAvailable ? '<span class="tag tag-success">Update available</span>' : '';
@@ -1351,7 +1367,7 @@ function renderInstalledModsList() {
             if (vc === '*' || vLower === 'all') return true;
             if (vc === currentVer) return true;
             if (currentBranch && (vc === currentBranch || vc.startsWith(currentBranch + '.') || vc.startsWith(currentBranch + 'x'))) return true;
-            if (currentBranch.toLowerCase() === 'early access' && vLower === 'early access') return true;
+            if (vLower === 'early access') return true;
             return false;
           });
           if (!isComp) {

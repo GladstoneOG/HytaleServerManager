@@ -426,7 +426,35 @@ async function run() {
   assert.strictEqual(isEyeSpyComp, false, 'EyeSpy must be detected as incompatible on 0.7.1');
   console.log('  ✓ Incompatibility detected: EyeSpy is correctly flagged for Hytale 0.6.x on 0.7.1 server');
 
-  console.log('\n🎉 ALL 21 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 22: Early Access Flag Handling (Uncertain Compatibility -> "Early Access" Tag)
+  console.log('Test 22: Early Access Flag Handling & Tag Presentation');
+  assert.strictEqual(
+    isModVersionCompatibleWithServer('*', '0.7.1', ['Early Access']),
+    true,
+    'Early Access flag must not be hard-rejected as incompatible'
+  );
+  assert.strictEqual(
+    isModVersionCompatibleWithServer('>=0.6.0', '0.7.1', ['Early Access']),
+    true,
+    'Early Access flag with open-ended manifest remains tentative/compatible'
+  );
+  assert.strictEqual(
+    isModVersionCompatibleWithServer('Early Access', '0.7.1', null),
+    true,
+    'Manifest Early Access spec accepted as tentative/compatible'
+  );
+
+  const yungMod = allInstalledMods.find((m) => m.fileName.includes('YUNGs-HyDungeons'));
+  assert(yungMod !== undefined, "YUNG's HyDungeons must be present in installed mods");
+  assert(
+    Array.isArray(yungMod.gameVersions) && yungMod.gameVersions.includes('Early Access'),
+    "YUNG's HyDungeons must have Early Access gameVersions"
+  );
+  const isYungComp = isModVersionCompatibleWithServer(yungMod.manifest.serverVersion, '0.7.1', yungMod.gameVersions);
+  assert.strictEqual(isYungComp, true, "YUNG's HyDungeons must not fail compatibility check");
+  console.log('  ✓ Early Access mods handled as tentative and will display "Early Access" tag');
+
+  console.log('\n🎉 ALL 22 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

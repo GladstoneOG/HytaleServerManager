@@ -35,7 +35,7 @@ function selectBestCurseForgeFile(modObj, targetServerVersion = null, allowBeta 
       if (gvClean === '*' || gvLower === 'all') return true;
       if (gvClean === targetServerVersion) return true;
       if (branch && (gvClean === branch || gvClean.startsWith(branch + '.') || gvClean.startsWith(branch + 'x'))) return true;
-      if (branch && branch.toLowerCase() === 'early access' && gvLower === 'early access') return true;
+      if (gvLower === 'early access') return true;
       return false;
     });
   };
