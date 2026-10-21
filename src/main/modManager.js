@@ -31,13 +31,12 @@ function selectBestCurseForgeFile(modObj, targetServerVersion = null, allowBeta 
     if (gvs.length === 0) return true;
     return gvs.some((gv) => {
       const gvClean = String(gv).trim();
-      return (
-        gvClean === targetServerVersion ||
-        gvClean === branch ||
-        gvClean === '*' ||
-        gvClean.toLowerCase() === 'early access' ||
-        (branch && gvClean.startsWith(branch))
-      );
+      const gvLower = gvClean.toLowerCase();
+      if (gvClean === '*' || gvLower === 'all') return true;
+      if (gvClean === targetServerVersion) return true;
+      if (branch && (gvClean === branch || gvClean.startsWith(branch + '.') || gvClean.startsWith(branch + 'x'))) return true;
+      if (branch && branch.toLowerCase() === 'early access' && gvLower === 'early access') return true;
+      return false;
     });
   };
 
@@ -453,6 +452,13 @@ class ModManager {
       }
     }
 
+    onProgress?.({
+      step: 'complete',
+      modName: modObj.name,
+      fileName,
+      message: `Installed ${modObj.name}`,
+    });
+
     return {
       success: true,
       fileName,
@@ -492,6 +498,12 @@ class ModManager {
     }
     await this.saveMetadata(meta);
 
+    onProgress?.({
+      step: 'complete',
+      modName: pkgInfo.name,
+      message: `Installed ${pkgInfo.name}`,
+    });
+
     return {
       success: true,
       ...res,
@@ -511,7 +523,13 @@ class ModManager {
       await this.deleteMod(item.fileName, false);
 
       // Install new jar
-      return await this.installCurseForgeMod(modObj, latestFile, { onProgress, signal });
+      const res = await this.installCurseForgeMod(modObj, latestFile, { onProgress, signal });
+      onProgress?.({
+        step: 'complete',
+        modName: item.manifest?.name || item.fileName,
+        message: `Updated ${item.manifest?.name || item.fileName}`,
+      });
+      return res;
     } else if (item.source === 'thunderstore' && item.remoteId) {
       const [namespace, name] = item.remoteId.split('/');
       const detail = await this.ts.getPackageDetail(namespace, name);
@@ -525,7 +543,13 @@ class ModManager {
       await this.deleteMod(item.fileName, false);
 
       // Install updated package
-      return await this.installThunderstoreMod(pkgInfo, { onProgress, signal });
+      const res = await this.installThunderstoreMod(pkgInfo, { onProgress, signal });
+      onProgress?.({
+        step: 'complete',
+        modName: item.manifest?.name || item.fileName,
+        message: `Updated ${item.manifest?.name || item.fileName}`,
+      });
+      return res;
     } else {
       throw new Error(`Mod ${item.manifest.name} does not have a connected update source.`);
     }

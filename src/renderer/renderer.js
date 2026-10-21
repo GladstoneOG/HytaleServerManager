@@ -205,8 +205,21 @@ let lastServerStatus = { isRunning: false, isDetached: false, pid: null };
 let currentServerVersion = '0.7.1';
 let modProgressHideTimer = null;
 
+if (filterServerVerTag) {
+  filterServerVerTag.textContent = currentServerVersion;
+}
+
 function getCurrentServerVersion() {
   return currentServerVersion || '0.7.1';
+}
+
+function formatGameVersionLabel(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+  if (/^\d+\.\d+$/.test(s)) {
+    return `${s}.x`;
+  }
+  return s;
 }
 
 function compareVersions(v1, v2) {
@@ -224,7 +237,7 @@ function compareVersions(v1, v2) {
 
 function getModVersionInfo(mod) {
   const currentVer = getCurrentServerVersion();
-  const currentBranch = currentVer.split('.').slice(0, 2).join('.');
+  const currentBranch = currentVer ? currentVer.split('.').slice(0, 2).join('.') : '0.7';
 
   const versions = new Set();
   const files = mod.latestFiles || [];
@@ -240,32 +253,47 @@ function getModVersionInfo(mod) {
   const versionList = Array.from(versions);
   const semverList = versionList.filter((v) => /^\d+\.\d+/.test(v)).sort(compareVersions);
 
-  let displayRange = '0.7';
+  let displayRange = '0.7.x';
   if (semverList.length === 1) {
-    displayRange = semverList[0];
+    displayRange = formatGameVersionLabel(semverList[0]);
   } else if (semverList.length > 1) {
-    displayRange = `${semverList[0]} – ${semverList[semverList.length - 1]}`;
+    displayRange = `${formatGameVersionLabel(semverList[0])} – ${formatGameVersionLabel(semverList[semverList.length - 1])}`;
   } else if (versionList.length > 0) {
-    displayRange = versionList.join(', ');
+    displayRange = versionList.map(formatGameVersionLabel).join(', ');
   }
 
-  // Check compatibility against current server
-  const isCompatible = versionList.length === 0 || versionList.some((v) => {
-    const vc = v.toLowerCase();
-    return (
-      v === currentVer ||
-      v === currentBranch ||
-      v.startsWith(currentBranch) ||
-      v === '*' ||
-      vc === 'early access'
-    );
+  // Strict compatibility check against current server
+  const isCompatible = versionList.some((v) => {
+    const vc = String(v).trim();
+    const vLower = vc.toLowerCase();
+    if (vc === '*' || vLower === 'all') return true;
+    if (vc === currentVer) return true;
+    if (currentBranch && (vc === currentBranch || vc.startsWith(currentBranch + '.') || vc.startsWith(currentBranch + 'x'))) return true;
+    if (currentBranch.toLowerCase() === 'early access' && vLower === 'early access') return true;
+    return false;
   });
 
-  // Find best Release file (prioritize releaseType === 1 to avoid beta/alpha)
-  let bestFile = null;
-  bestFile = files.find((f) => f.releaseType === 1 && (f.gameVersions || []).some((v) => v === currentBranch || v === currentVer || v.startsWith(currentBranch)));
+  // Find best Release file (prioritize releaseType === 1 that is compatible)
+  const isFileComp = (f) => {
+    const gvs = f.gameVersions || [];
+    if (gvs.length === 0) return false;
+    return gvs.some((v) => {
+      const vc = String(v).trim();
+      const vLower = vc.toLowerCase();
+      if (vc === '*' || vLower === 'all') return true;
+      if (vc === currentVer) return true;
+      if (currentBranch && (vc === currentBranch || vc.startsWith(currentBranch + '.') || vc.startsWith(currentBranch + 'x'))) return true;
+      if (currentBranch.toLowerCase() === 'early access' && vLower === 'early access') return true;
+      return false;
+    });
+  };
+
+  let bestFile = files.find((f) => f.releaseType === 1 && isFileComp(f));
   if (!bestFile) {
     bestFile = files.find((f) => f.releaseType === 1);
+  }
+  if (!bestFile) {
+    bestFile = files.find((f) => isFileComp(f));
   }
   if (!bestFile && files.length > 0) {
     bestFile = files[0];
@@ -289,6 +317,10 @@ function showModProgress(title, percent, detail = '') {
   if (!modActionDock) return;
   clearTimeout(modProgressHideTimer);
   modActionDock.classList.remove('hidden');
+  const spinner = modActionDock.querySelector('.spinner-sm');
+  if (spinner) {
+    spinner.style.display = percent >= 100 ? 'none' : 'inline-block';
+  }
   if (modActionTitle) modActionTitle.textContent = title;
   if (modActionStats) modActionStats.textContent = detail || (typeof percent === 'number' ? `${percent}%` : '');
   if (modActionFill && typeof percent === 'number') {
@@ -906,6 +938,43 @@ wizardBtnStart.addEventListener('click', async () => {
 // ============================================================================
 // Installed Mods (Library: Thumbnails, Multi-Selection & Sorting)
 // ============================================================================
+function updateModsFilterCounts() {
+  const total = currentInstalledMods.length;
+  const enabled = currentInstalledMods.filter((m) => m.isEnabled).length;
+  const disabled = total - enabled;
+  const updates = currentInstalledMods.filter((m) => m.updateAvailable).length;
+
+  if (statTotalMods) statTotalMods.textContent = total;
+  if (statEnabledMods) statEnabledMods.textContent = enabled;
+  if (statUpdatesMods) {
+    statUpdatesMods.textContent = updates;
+    statUpdatesMods.closest('.stat')?.classList.toggle('has-updates', updates > 0);
+  }
+  const isFiltering = modsSearchInput?.value?.trim() !== '' || currentModsSourceFilter !== 'all' || currentModsFilter !== 'all';
+  if (!isFiltering && navModsCount) {
+    navModsCount.textContent = total;
+  }
+
+  const counts = { all: total, enabled, disabled, updates };
+  if (modsFilter) {
+    modsFilter.querySelectorAll('[data-count]').forEach((el) => {
+      const k = el.dataset.count;
+      el.textContent = counts[k] ? `${counts[k]}` : '';
+    });
+  }
+
+  if (btnUpdateAllMods) {
+    if (updates > 0) {
+      btnUpdateAllMods.classList.remove('hidden');
+      btnUpdateAllMods.className = 'btn btn-update btn-sm';
+      const span = btnUpdateAllMods.querySelector('span');
+      if (span) span.textContent = `Update all (${updates})`;
+    } else {
+      btnUpdateAllMods.classList.add('hidden');
+    }
+  }
+}
+
 async function loadInstalledMods(checkRemoteUpdates = true) {
   try {
     if (currentInstalledMods.length === 0) {
@@ -915,31 +984,7 @@ async function loadInstalledMods(checkRemoteUpdates = true) {
     const mods = await window.api.getInstalledMods(checkRemoteUpdates);
     currentInstalledMods = mods || [];
 
-    const total = currentInstalledMods.length;
-    const enabled = currentInstalledMods.filter((m) => m.isEnabled).length;
-    const disabled = total - enabled;
-    const updates = currentInstalledMods.filter((m) => m.updateAvailable).length;
-
-    statTotalMods.textContent = total;
-    statEnabledMods.textContent = enabled;
-    statUpdatesMods.textContent = updates;
-    statUpdatesMods.closest('.stat')?.classList.toggle('has-updates', updates > 0);
-    navModsCount.textContent = total;
-
-    const counts = { all: total, enabled, disabled, updates };
-    modsFilter.querySelectorAll('[data-count]').forEach((el) => {
-      const k = el.dataset.count;
-      el.textContent = counts[k] ? `${counts[k]}` : '';
-    });
-
-    if (updates > 0) {
-      btnUpdateAllMods.classList.remove('hidden');
-      btnUpdateAllMods.className = 'btn btn-update btn-sm';
-      btnUpdateAllMods.querySelector('span').textContent = `Update all (${updates})`;
-    } else {
-      btnUpdateAllMods.classList.add('hidden');
-    }
-
+    updateModsFilterCounts();
     renderInstalledModsList();
   } catch (e) {
     installedModsList.innerHTML = `<div class="empty"><div class="empty-title">Could not read mods</div><div class="empty-sub">${escapeHtml(e.message)}</div></div>`;
@@ -1103,6 +1148,9 @@ function renderInstalledModsList() {
           row.dataset.fileName = res.newFileName;
           updateBatchBarState();
           updateModsFilterCounts();
+          if (currentModsFilter !== 'all') {
+            renderInstalledModsList();
+          }
         } else {
           throw new Error(res?.error || 'Failed to toggle');
         }
@@ -1120,18 +1168,24 @@ function renderInstalledModsList() {
     if (updateBtn) {
       updateBtn.addEventListener('click', async () => {
         const currentVer = getCurrentServerVersion();
-        const currentBranch = currentVer.split('.').slice(0, 2).join('.');
+        const currentBranch = currentVer ? currentVer.split('.').slice(0, 2).join('.') : '0.7';
         const remoteFile = m.latestRemoteFile;
 
         if (remoteFile && remoteFile.gameVersions && remoteFile.gameVersions.length > 0) {
           const isComp = remoteFile.gameVersions.some((v) => {
-            const vc = String(v).trim().toLowerCase();
-            return v === currentVer || v === currentBranch || v.startsWith(currentBranch) || v === '*' || vc === 'early access';
+            const vc = String(v).trim();
+            const vLower = vc.toLowerCase();
+            if (vc === '*' || vLower === 'all') return true;
+            if (vc === currentVer) return true;
+            if (currentBranch && (vc === currentBranch || vc.startsWith(currentBranch + '.') || vc.startsWith(currentBranch + 'x'))) return true;
+            if (currentBranch.toLowerCase() === 'early access' && vLower === 'early access') return true;
+            return false;
           });
           if (!isComp) {
+            const formattedGVs = remoteFile.gameVersions.map(formatGameVersionLabel).join(', ');
             const ok = await confirmDialog({
               title: '⚠️ Version Compatibility Warning',
-              message: `This update for "${m.manifest?.name || m.fileName}" is built for Hytale ${remoteFile.gameVersions.join(', ')}, but your server is running ${currentVer}. It may not work properly or cause crashes. Do you want to update anyway?`,
+              message: `This update for "${m.manifest?.name || m.fileName}" is built for Hytale ${formattedGVs}, but your server is running ${currentVer}. It may not work properly or cause crashes. Do you want to update anyway?`,
               confirmLabel: 'Update anyway',
               danger: true,
             });
@@ -1141,17 +1195,22 @@ function renderInstalledModsList() {
 
         updateBtn.disabled = true;
         updateBtn.textContent = 'Updating…';
+        showModProgress(`Updating ${m.manifest?.name || m.fileName}...`, 25, 'Starting');
         try {
           const res = await window.api.updateMod(m, { targetServerVersion: currentVer });
           if (res.success) {
+            showModProgress(`Updated ${m.manifest?.name || m.fileName}`, 100, 'Done');
+            hideModProgress(1200);
             showToast(`Updated ${m.manifest?.name || m.fileName}`, 'success');
             await loadInstalledMods(true);
           } else {
+            hideModProgress(500);
             showToast(`Update failed: ${res.error}`, 'error');
             updateBtn.disabled = false;
             updateBtn.textContent = 'Update';
           }
         } catch (err) {
+          hideModProgress(500);
           showToast(`Error: ${err.message}`, 'error');
           updateBtn.disabled = false;
           updateBtn.textContent = 'Update';
@@ -1630,19 +1689,24 @@ function renderCurseForgeFilteredResults() {
 
         installBtn.disabled = true;
         installBtn.textContent = 'Installing…';
+        showModProgress(`Downloading ${mod.name}...`, 10, 'Starting');
         try {
           const r = await window.api.installCfMod(mod, latestFile, true);
           if (r.success) {
+            showModProgress(`Installed ${mod.name}`, 100, 'Done');
+            hideModProgress(1200);
             showToast(`Installed ${mod.name}`, 'success');
             installBtn.textContent = 'Installed';
             installBtn.className = 'btn btn-ghost btn-sm';
             await loadInstalledMods(false);
           } else {
+            hideModProgress(500);
             showToast(`Install failed: ${r.error}`, 'error');
             installBtn.disabled = false;
             installBtn.textContent = btnLabel;
           }
         } catch (err) {
+          hideModProgress(500);
           showToast(`Install error: ${err.message}`, 'error');
           installBtn.disabled = false;
           installBtn.textContent = btnLabel;
@@ -1750,19 +1814,24 @@ function renderThunderstoreFilteredResults() {
       installBtn.addEventListener('click', async () => {
         installBtn.disabled = true;
         installBtn.textContent = 'Installing…';
+        showModProgress(`Downloading ${pkg.name}...`, 10, 'Starting');
         try {
           const res = await window.api.installThunderstore(pkg);
           if (res.success) {
+            showModProgress(`Installed ${pkg.name}`, 100, 'Done');
+            hideModProgress(1200);
             showToast(`Installed ${pkg.name}`, 'success');
             installBtn.textContent = 'Installed';
             installBtn.className = 'btn btn-ghost btn-sm';
             await loadInstalledMods(false);
           } else {
+            hideModProgress(500);
             showToast(`Install failed: ${res.error}`, 'error');
             installBtn.disabled = false;
             installBtn.textContent = 'Install';
           }
         } catch (err) {
+          hideModProgress(500);
           showToast(`Error: ${err.message}`, 'error');
           installBtn.disabled = false;
           installBtn.textContent = 'Install';
@@ -1824,19 +1893,24 @@ async function openModModal(mod, latestFile) {
     const btn = e.currentTarget;
     btn.disabled = true;
     btn.textContent = 'Installing…';
+    showModProgress(`Downloading ${mod.name}...`, 10, 'Starting');
     try {
       const res = await window.api.installCfMod(mod, targetFile, true);
       if (res.success) {
+        showModProgress(`Installed ${mod.name}`, 100, 'Done');
+        hideModProgress(1200);
         showToast(`Installed ${mod.name}`, 'success');
         modModal.classList.add('hidden');
         await loadInstalledMods(false);
         if (currentBrowseSource === 'curseforge') loadCurseForgeMods();
       } else {
+        hideModProgress(500);
         showToast(`Install failed: ${res.error}`, 'error');
         btn.disabled = false;
         btn.textContent = 'Install';
       }
     } catch (err) {
+      hideModProgress(500);
       showToast(`Install error: ${err.message}`, 'error');
       btn.disabled = false;
       btn.textContent = 'Install';
@@ -2165,6 +2239,7 @@ window.api.onModActionProgress((p) => {
     showModProgress(p.message || `Installing ${modName}...`, 85, 'Extracting');
   } else if (p.step === 'complete' || p.step === 'done') {
     showModProgress(p.message || `Completed!`, 100, 'Done');
+    showToast(p.message || `Completed ${modName}`, 'success');
     hideModProgress(1500);
   }
 });

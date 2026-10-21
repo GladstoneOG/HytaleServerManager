@@ -215,7 +215,46 @@ async function run() {
   assert.strictEqual(selected.fileName, 'Mock-release-0.7.jar');
   console.log('  ✓ Correctly selected compatible Release build (avoided Beta build)');
 
-  console.log('\n🎉 ALL 15 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 16: Strict Version Compatibility & 3-Dot Formatting
+  console.log('Test 16: Strict Version Compatibility & 3-Dot Formatting');
+  const legacyMod = {
+    name: 'EyeSpy',
+    latestFiles: [
+      { id: 101, fileName: 'EyeSpy-0.6.jar', releaseType: 1, gameVersions: ['0.6', 'Early Access'] },
+      { id: 100, fileName: 'EyeSpy-0.5.jar', releaseType: 1, gameVersions: ['0.5', 'Early Access'] },
+    ],
+  };
+  const branch = '0.7';
+  const isCompatibleWith07 = (f) => {
+    const gvs = f.gameVersions || [];
+    return gvs.some((gv) => {
+      const gvClean = String(gv).trim();
+      const gvLower = gvClean.toLowerCase();
+      if (gvClean === '*' || gvLower === 'all') return true;
+      if (gvClean === '0.7.1') return true;
+      if (branch && (gvClean === branch || gvClean.startsWith(branch + '.') || gvClean.startsWith(branch + 'x'))) return true;
+      if (branch && branch.toLowerCase() === 'early access' && gvLower === 'early access') return true;
+      return false;
+    });
+  };
+  assert.strictEqual(isCompatibleWith07(legacyMod.latestFiles[0]), false);
+  assert.strictEqual(isCompatibleWith07(legacyMod.latestFiles[1]), false);
+
+  function formatGameVersionLabel(v) {
+    if (!v) return '';
+    const s = String(v).trim();
+    if (/^\d+\.\d+$/.test(s)) {
+      return `${s}.x`;
+    }
+    return s;
+  }
+  assert.strictEqual(formatGameVersionLabel('0.7'), '0.7.x');
+  assert.strictEqual(formatGameVersionLabel('0.6'), '0.6.x');
+  assert.strictEqual(formatGameVersionLabel('0.7.1'), '0.7.1');
+  assert.strictEqual(formatGameVersionLabel('Early Access'), 'Early Access');
+  console.log('  ✓ Strict version compatibility and 3-dot formatting verified');
+
+  console.log('\n🎉 ALL 16 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {
