@@ -4,7 +4,7 @@
  */
 const assert = require('assert');
 const path = require('path');
-const { compareVersions, hashFile, safeName } = require('../src/main/util');
+const { compareVersions, hashFile, safeName, isModVersionCompatibleWithServer, formatGameVersionLabel } = require('../src/main/util');
 const { murmur2, normalize, curseforgeFingerprint } = require('../src/main/murmur2');
 const { CurseForgeClient } = require('../src/main/curseforge');
 const { ThunderstoreClient } = require('../src/main/thunderstore');
@@ -258,92 +258,6 @@ async function run() {
   assert.strictEqual(formatGameVersionLabel('0.7.1'), '0.7.1');
   assert.strictEqual(formatGameVersionLabel('Early Access'), 'Early Access');
 
-  function cleanVerNum(v) {
-    if (!v) return '0';
-    const clean = String(v).replace(/^[v^~>=<\s]+/, '').split('-')[0].trim();
-    return clean || '0';
-  }
-
-  function isDateOrBuildTag(v) {
-    if (!v) return false;
-    const c = cleanVerNum(v);
-    const major = parseInt(c.split('.')[0], 10);
-    return major > 100 || /[a-f0-9]{7,}/i.test(String(v));
-  }
-
-  function checkSingleClause(clause, currentServerVer) {
-    const curClean = cleanVerNum(currentServerVer);
-    const curBranch = curClean.split('.').slice(0, 2).join('.');
-    const tokens = clause.trim().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return true;
-    for (const rawToken of tokens) {
-      const token = rawToken.trim();
-      if (token === '*' || token.toLowerCase() === 'all') continue;
-      if (isDateOrBuildTag(token)) continue;
-      if (token.startsWith('^')) {
-        const minVer = cleanVerNum(token.slice(1));
-        const parts = minVer.split('.').map((n) => parseInt(n, 10) || 0);
-        let maxVer = '1.0.0';
-        if (parts[0] === 0) maxVer = '0.' + ((parts[1] || 0) + 1) + '.0';
-        else maxVer = (parts[0] + 1) + '.0.0';
-        if (compareVersions(curClean, minVer) < 0 || compareVersions(curClean, maxVer) >= 0) return false;
-        continue;
-      }
-      if (token.startsWith('~')) {
-        const minVer = cleanVerNum(token.slice(1));
-        const parts = minVer.split('.').map((n) => parseInt(n, 10) || 0);
-        const maxVer = (parts[0] || 0) + '.' + ((parts[1] || 0) + 1) + '.0';
-        if (compareVersions(curClean, minVer) < 0 || compareVersions(curClean, maxVer) >= 0) return false;
-        continue;
-      }
-      if (token.startsWith('>=')) {
-        if (compareVersions(curClean, cleanVerNum(token.slice(2))) < 0) return false;
-        continue;
-      }
-      if (token.startsWith('>')) {
-        if (compareVersions(curClean, cleanVerNum(token.slice(1))) <= 0) return false;
-        continue;
-      }
-      if (token.startsWith('<=')) {
-        if (compareVersions(curClean, cleanVerNum(token.slice(2))) > 0) return false;
-        continue;
-      }
-      if (token.startsWith('<')) {
-        if (compareVersions(curClean, cleanVerNum(token.slice(1))) >= 0) return false;
-        continue;
-      }
-      const cleanToken = cleanVerNum(token);
-      if (cleanToken === curClean) continue;
-      if (token === curBranch || token.startsWith(curBranch + '.') || token.startsWith(curBranch + 'x')) continue;
-      if (token.toLowerCase() === 'early access' && curBranch.toLowerCase() === 'early access') continue;
-      return false;
-    }
-    return true;
-  }
-
-  function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remoteGameVersions = null) {
-    if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all') return true;
-    if (!currentServerVer) return true;
-    const curClean = cleanVerNum(currentServerVer);
-    const curBranch = curClean.split('.').slice(0, 2).join('.');
-    if (Array.isArray(remoteGameVersions) && remoteGameVersions.length > 0) {
-      const remoteMatches = remoteGameVersions.some((gv) => {
-        const gvClean = String(gv).trim();
-        const gvLower = gvClean.toLowerCase();
-        if (gvClean === '*' || gvLower === 'all') return true;
-        if (gvClean === curClean) return true;
-        if (gvClean === curBranch || gvClean.startsWith(curBranch + '.') || gvClean.startsWith(curBranch + 'x')) return true;
-        if (gvLower === 'early access') return true;
-        return false;
-      });
-      if (remoteMatches) return true;
-    }
-    const spec = String(serverVerSpec).trim();
-    if (isDateOrBuildTag(spec)) return true;
-    const clauses = spec.split('||');
-    return clauses.some((clause) => checkSingleClause(clause, currentServerVer));
-  }
-
   assert.strictEqual(isModVersionCompatibleWithServer('^0.7.0', '0.7.1'), true);
   assert.strictEqual(isModVersionCompatibleWithServer('^0.6.0', '0.7.1'), false);
   assert.strictEqual(isModVersionCompatibleWithServer('>=0.6.0 <0.8.0 || >=0.7.0-pre.5 <0.7.0', '0.7.1'), true);
@@ -472,7 +386,47 @@ async function run() {
   assert(converted.includes('[Hytale] Logger Initialized'));
   console.log(`  ✓ Converted "${utcLog}" -> "${converted}" according to system timezone`);
 
-  console.log('\n🎉 ALL 20 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 21: Platform Game Version Metadata & Incompatible Mod Badge in Library
+  console.log('Test 21: Platform Game Version Metadata & Incompatible Mod Badge');
+  
+  // 1. Authoritative platform tags override open-ended manifest ranges
+  assert.strictEqual(
+    isModVersionCompatibleWithServer('>=0.6.0', '0.7.1', ['0.6']),
+    false,
+    'EyeSpy manifest ">=0.6.0" must be flagged as incompatible when platform gameVersions is ["0.6"] on 0.7.1 server'
+  );
+  assert.strictEqual(
+    isModVersionCompatibleWithServer('*', '0.7.1', ['0.6']),
+    false,
+    'Wildcard manifest "*" must be flagged as incompatible when platform gameVersions is ["0.6"] on 0.7.1 server'
+  );
+  assert.strictEqual(
+    isModVersionCompatibleWithServer('>=0.6.0', '0.7.1', ['0.7']),
+    true,
+    'Compatible when platform tags match server branch'
+  );
+  assert.strictEqual(
+    isModVersionCompatibleWithServer('^0.6.0', '0.7.1', null),
+    false,
+    'Local mod without platform tags: caret range ^0.6.0 rejects 0.7.1'
+  );
+  assert.strictEqual(formatGameVersionLabel('0.6'), '0.6.x');
+
+  // 2. Scan installed mods and verify EyeSpy has platform gameVersions and is detected as incompatible
+  const verifiedModMgr = new ModManager({
+    serverDir: 'F:\\serverht\\Server',
+    curseforgeClient: cf,
+    thunderstoreClient: ts,
+  });
+  const allInstalledMods = await verifiedModMgr.getInstalledMods(false);
+  const eyeSpyMod = allInstalledMods.find((m) => m.fileName.includes('EyeSpy'));
+  assert(eyeSpyMod !== undefined, 'EyeSpy must be present in installed mods');
+  assert(Array.isArray(eyeSpyMod.gameVersions) && eyeSpyMod.gameVersions.includes('0.6'), 'EyeSpy must track gameVersions ["0.6"]');
+  const isEyeSpyComp = isModVersionCompatibleWithServer(eyeSpyMod.manifest.serverVersion, '0.7.1', eyeSpyMod.gameVersions);
+  assert.strictEqual(isEyeSpyComp, false, 'EyeSpy must be detected as incompatible on 0.7.1');
+  console.log('  ✓ Incompatibility detected: EyeSpy is correctly flagged for Hytale 0.6.x on 0.7.1 server');
+
+  console.log('\n🎉 ALL 21 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

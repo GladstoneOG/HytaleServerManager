@@ -323,12 +323,12 @@ function checkSingleClause(clause, currentServerVer) {
 }
 
 function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remoteGameVersions = null) {
-  if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all') return true;
   if (!currentServerVer) return true;
 
   const curClean = cleanVerNum(currentServerVer);
   const curBranch = curClean.split('.').slice(0, 2).join('.');
 
+  // 1. Authoritative platform game versions (e.g. CurseForge / Thunderstore tags)
   if (Array.isArray(remoteGameVersions) && remoteGameVersions.length > 0) {
     const remoteMatches = remoteGameVersions.some((gv) => {
       const gvClean = String(gv).trim();
@@ -336,11 +336,17 @@ function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remot
       if (gvClean === '*' || gvLower === 'all') return true;
       if (gvClean === curClean) return true;
       if (gvClean === curBranch || gvClean.startsWith(curBranch + '.') || gvClean.startsWith(curBranch + 'x')) return true;
-      if (gvLower === 'early access') return true;
+      if (gvLower === 'early access' && curBranch.toLowerCase() === 'early access') return true;
       return false;
     });
-    if (remoteMatches) return true;
+    // If platform specifies target game versions and none match the server branch, it is NOT compatible
+    if (!remoteMatches) {
+      return false;
+    }
   }
+
+  // 2. Internal manifest.json specification
+  if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all') return true;
 
   const spec = String(serverVerSpec).trim();
   if (isDateOrBuildTag(spec)) return true;
@@ -1056,10 +1062,17 @@ wizardBtnStart.addEventListener('click', async () => {
 // Installed Mods (Library: Thumbnails, Multi-Selection & Sorting)
 // ============================================================================
 function updateModsFilterCounts() {
+  const currentVer = getCurrentServerVersion();
   const total = currentInstalledMods.length;
   const enabled = currentInstalledMods.filter((m) => m.isEnabled).length;
   const disabled = total - enabled;
   const updates = currentInstalledMods.filter((m) => m.updateAvailable).length;
+  const incompatible = currentInstalledMods.filter((m) => {
+    const remoteGVs = (Array.isArray(m.gameVersions) && m.gameVersions.length > 0)
+      ? m.gameVersions
+      : (m.latestRemoteFile?.gameVersions || []);
+    return !isModVersionCompatibleWithServer(m.manifest?.serverVersion, currentVer, remoteGVs);
+  }).length;
 
   if (statTotalMods) statTotalMods.textContent = total;
   if (statEnabledMods) statEnabledMods.textContent = enabled;
@@ -1072,12 +1085,24 @@ function updateModsFilterCounts() {
     navModsCount.textContent = total;
   }
 
-  const counts = { all: total, enabled, disabled, updates };
+  const counts = { all: total, enabled, disabled, updates, incompatible };
   if (modsFilter) {
     modsFilter.querySelectorAll('[data-count]').forEach((el) => {
       const k = el.dataset.count;
       el.textContent = counts[k] ? `${counts[k]}` : '';
     });
+    const btnIncompat = modsFilter.querySelector('button[data-value="incompatible"]');
+    if (btnIncompat) {
+      if (incompatible > 0) {
+        btnIncompat.classList.remove('hidden');
+      } else {
+        btnIncompat.classList.add('hidden');
+        if (currentModsFilter === 'incompatible') {
+          currentModsFilter = 'all';
+          setSegmentedValue(modsFilter, 'all');
+        }
+      }
+    }
   }
 
   if (btnUpdateAllMods) {
@@ -1136,6 +1161,14 @@ function renderInstalledModsList() {
     if (currentModsFilter === 'enabled' && !m.isEnabled) return false;
     if (currentModsFilter === 'disabled' && m.isEnabled) return false;
     if (currentModsFilter === 'updates' && !m.updateAvailable) return false;
+    if (currentModsFilter === 'incompatible') {
+      const currentVer = getCurrentServerVersion();
+      const remoteGVs = (Array.isArray(m.gameVersions) && m.gameVersions.length > 0)
+        ? m.gameVersions
+        : (m.latestRemoteFile?.gameVersions || []);
+      const isComp = isModVersionCompatibleWithServer(m.manifest?.serverVersion, currentVer, remoteGVs);
+      if (isComp) return false;
+    }
 
     if (currentModsSourceFilter !== 'all' && m.source !== currentModsSourceFilter) return false;
 
@@ -1193,10 +1226,25 @@ function renderInstalledModsList() {
 
     const currentVer = getCurrentServerVersion();
     const serverVerSpec = m.manifest?.serverVersion;
-    const isComp = isModVersionCompatibleWithServer(serverVerSpec, currentVer, m.latestRemoteFile?.gameVersions);
-    const compatTag = (!isComp && serverVerSpec && serverVerSpec !== '*')
-      ? `<span class="tag tag-danger" title="This mod was built for Hytale ${escapeHtml(formatGameVersionLabel(serverVerSpec))}, but your server is running ${escapeHtml(currentVer)}.">⚠️ Hytale ${escapeHtml(formatGameVersionLabel(serverVerSpec))}</span>`
-      : '';
+    const remoteGVs = (Array.isArray(m.gameVersions) && m.gameVersions.length > 0)
+      ? m.gameVersions
+      : (m.latestRemoteFile?.gameVersions || []);
+
+    const isComp = isModVersionCompatibleWithServer(serverVerSpec, currentVer, remoteGVs);
+    let compatTag = '';
+    if (!isComp) {
+      let targetVerLabel = '';
+      if (Array.isArray(remoteGVs) && remoteGVs.length > 0) {
+        targetVerLabel = remoteGVs.map(formatGameVersionLabel).join(', ');
+      } else if (serverVerSpec && serverVerSpec !== '*') {
+        targetVerLabel = formatGameVersionLabel(serverVerSpec);
+      }
+      const labelText = targetVerLabel ? `⚠️ Hytale ${escapeHtml(targetVerLabel)}` : '⚠️ Incompatible';
+      const tooltipText = targetVerLabel
+        ? `This mod was built for Hytale ${escapeHtml(targetVerLabel)}, but your server is running ${escapeHtml(currentVer)}.`
+        : `This mod is incompatible with server version ${escapeHtml(currentVer)}.`;
+      compatTag = `<span class="tag tag-danger" title="${tooltipText}">${labelText}</span>`;
+    }
 
     const updateTag = m.updateAvailable ? '<span class="tag tag-success">Update available</span>' : '';
     const authors = (m.manifest?.authors || []).map((a) => (typeof a === 'string' ? a : a.Name)).filter(Boolean).join(', ');
@@ -1396,6 +1444,14 @@ modsSelectAll.addEventListener('change', (e) => {
     if (currentModsFilter === 'enabled' && !m.isEnabled) return false;
     if (currentModsFilter === 'disabled' && m.isEnabled) return false;
     if (currentModsFilter === 'updates' && !m.updateAvailable) return false;
+    if (currentModsFilter === 'incompatible') {
+      const currentVer = getCurrentServerVersion();
+      const remoteGVs = (Array.isArray(m.gameVersions) && m.gameVersions.length > 0)
+        ? m.gameVersions
+        : (m.latestRemoteFile?.gameVersions || []);
+      const isComp = isModVersionCompatibleWithServer(m.manifest?.serverVersion, currentVer, remoteGVs);
+      if (isComp) return false;
+    }
     if (currentModsSourceFilter !== 'all' && m.source !== currentModsSourceFilter) return false;
     return true;
   });

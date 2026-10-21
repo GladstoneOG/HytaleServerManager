@@ -234,6 +234,7 @@ class ModManager {
         remoteId: savedMeta.remoteId || null,
         curseforgeFileId: savedMeta.fileId || null,
         remoteVersion: savedMeta.remoteVersion || null,
+        gameVersions: savedMeta.gameVersions || [],
         iconUrl: savedMeta.iconUrl || null,
         updateAvailable: false,
         latestRemoteFile: null,
@@ -270,7 +271,9 @@ class ModManager {
               fileId: match.file.id,
               version: item.manifest.version,
               name: item.manifest.name,
+              gameVersions: match.file.gameVersions || [],
             };
+            item.gameVersions = match.file.gameVersions || [];
 
             // Check if latest files have newer version (compatible Release build)
             if (match.latestFiles && match.latestFiles.length > 0) {
@@ -301,6 +304,36 @@ class ModManager {
                 if (!meta.installedMods[item.fileName]) meta.installedMods[item.fileName] = {};
                 meta.installedMods[item.fileName].iconUrl = item.iconUrl;
                 metaChanged = true;
+              }
+
+              // Backfill gameVersions if missing from metadata
+              if (!item.gameVersions || item.gameVersions.length === 0) {
+                let matchFile = null;
+                if (item.curseforgeFileId && modInfo.latestFiles) {
+                  matchFile = modInfo.latestFiles.find((f) => f.id === item.curseforgeFileId);
+                }
+                if (!matchFile && modInfo.latestFiles) {
+                  matchFile = modInfo.latestFiles.find((f) => safeName(f.fileName) === safeName(item.fileName));
+                }
+                if (matchFile && matchFile.gameVersions && matchFile.gameVersions.length > 0) {
+                  item.gameVersions = matchFile.gameVersions;
+                } else if (modInfo.latestFilesIndexes && modInfo.latestFilesIndexes.length > 0) {
+                  const idx = modInfo.latestFilesIndexes.find(
+                    (i) => (item.curseforgeFileId && i.fileId === item.curseforgeFileId) || (i.filename && safeName(i.filename) === safeName(item.fileName))
+                  );
+                  if (idx && idx.gameVersion) {
+                    item.gameVersions = [idx.gameVersion];
+                  }
+                }
+                if ((!item.gameVersions || item.gameVersions.length === 0) && modInfo.latestFiles && modInfo.latestFiles.length > 0) {
+                  item.gameVersions = modInfo.latestFiles[0].gameVersions || [];
+                }
+
+                if (item.gameVersions && item.gameVersions.length > 0) {
+                  if (!meta.installedMods[item.fileName]) meta.installedMods[item.fileName] = {};
+                  meta.installedMods[item.fileName].gameVersions = item.gameVersions;
+                  metaChanged = true;
+                }
               }
               if (modInfo.latestFiles && modInfo.latestFiles.length > 0 && !item.updateAvailable) {
                 const bestFile = selectBestCurseForgeFile(modInfo, serverVersion, false);
@@ -520,6 +553,7 @@ class ModManager {
       fileId: fileObj.id,
       name: modObj.name,
       version: fileObj.displayName || fileObj.fileName,
+      gameVersions: fileObj.gameVersions || [],
       iconUrl: modObj.logo?.thumbnailUrl || modObj.logo?.url || null,
       installedAt: Date.now(),
     };

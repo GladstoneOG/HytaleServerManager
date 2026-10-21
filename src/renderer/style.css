@@ -669,6 +669,20 @@ summary,
   font-variant-numeric: tabular-nums;
 }
 
+.segmented button[data-value="incompatible"] {
+  color: #ef4444;
+}
+
+.segmented button[data-value="incompatible"] .seg-count {
+  color: #f87171;
+  font-weight: 700;
+}
+
+.segmented button[data-value="incompatible"].active {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
 /* Inputs & Selects */
 .input,
 .select {
