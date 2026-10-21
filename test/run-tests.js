@@ -257,6 +257,100 @@ async function run() {
   assert.strictEqual(formatGameVersionLabel('0.6'), '0.6.x');
   assert.strictEqual(formatGameVersionLabel('0.7.1'), '0.7.1');
   assert.strictEqual(formatGameVersionLabel('Early Access'), 'Early Access');
+
+  function cleanVerNum(v) {
+    if (!v) return '0';
+    const clean = String(v).replace(/^[v^~>=<\s]+/, '').split('-')[0].trim();
+    return clean || '0';
+  }
+
+  function isDateOrBuildTag(v) {
+    if (!v) return false;
+    const c = cleanVerNum(v);
+    const major = parseInt(c.split('.')[0], 10);
+    return major > 100 || /[a-f0-9]{7,}/i.test(String(v));
+  }
+
+  function checkSingleClause(clause, currentServerVer) {
+    const curClean = cleanVerNum(currentServerVer);
+    const curBranch = curClean.split('.').slice(0, 2).join('.');
+    const tokens = clause.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return true;
+    for (const rawToken of tokens) {
+      const token = rawToken.trim();
+      if (token === '*' || token.toLowerCase() === 'all') continue;
+      if (isDateOrBuildTag(token)) continue;
+      if (token.startsWith('^')) {
+        const minVer = cleanVerNum(token.slice(1));
+        const parts = minVer.split('.').map((n) => parseInt(n, 10) || 0);
+        let maxVer = '1.0.0';
+        if (parts[0] === 0) maxVer = '0.' + ((parts[1] || 0) + 1) + '.0';
+        else maxVer = (parts[0] + 1) + '.0.0';
+        if (compareVersions(curClean, minVer) < 0 || compareVersions(curClean, maxVer) >= 0) return false;
+        continue;
+      }
+      if (token.startsWith('~')) {
+        const minVer = cleanVerNum(token.slice(1));
+        const parts = minVer.split('.').map((n) => parseInt(n, 10) || 0);
+        const maxVer = (parts[0] || 0) + '.' + ((parts[1] || 0) + 1) + '.0';
+        if (compareVersions(curClean, minVer) < 0 || compareVersions(curClean, maxVer) >= 0) return false;
+        continue;
+      }
+      if (token.startsWith('>=')) {
+        if (compareVersions(curClean, cleanVerNum(token.slice(2))) < 0) return false;
+        continue;
+      }
+      if (token.startsWith('>')) {
+        if (compareVersions(curClean, cleanVerNum(token.slice(1))) <= 0) return false;
+        continue;
+      }
+      if (token.startsWith('<=')) {
+        if (compareVersions(curClean, cleanVerNum(token.slice(2))) > 0) return false;
+        continue;
+      }
+      if (token.startsWith('<')) {
+        if (compareVersions(curClean, cleanVerNum(token.slice(1))) >= 0) return false;
+        continue;
+      }
+      const cleanToken = cleanVerNum(token);
+      if (cleanToken === curClean) continue;
+      if (token === curBranch || token.startsWith(curBranch + '.') || token.startsWith(curBranch + 'x')) continue;
+      if (token.toLowerCase() === 'early access' && curBranch.toLowerCase() === 'early access') continue;
+      return false;
+    }
+    return true;
+  }
+
+  function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remoteGameVersions = null) {
+    if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all') return true;
+    if (!currentServerVer) return true;
+    const curClean = cleanVerNum(currentServerVer);
+    const curBranch = curClean.split('.').slice(0, 2).join('.');
+    if (Array.isArray(remoteGameVersions) && remoteGameVersions.length > 0) {
+      const remoteMatches = remoteGameVersions.some((gv) => {
+        const gvClean = String(gv).trim();
+        const gvLower = gvClean.toLowerCase();
+        if (gvClean === '*' || gvLower === 'all') return true;
+        if (gvClean === curClean) return true;
+        if (gvClean === curBranch || gvClean.startsWith(curBranch + '.') || gvClean.startsWith(curBranch + 'x')) return true;
+        if (gvLower === 'early access') return true;
+        return false;
+      });
+      if (remoteMatches) return true;
+    }
+    const spec = String(serverVerSpec).trim();
+    if (isDateOrBuildTag(spec)) return true;
+    const clauses = spec.split('||');
+    return clauses.some((clause) => checkSingleClause(clause, currentServerVer));
+  }
+
+  assert.strictEqual(isModVersionCompatibleWithServer('^0.7.0', '0.7.1'), true);
+  assert.strictEqual(isModVersionCompatibleWithServer('^0.6.0', '0.7.1'), false);
+  assert.strictEqual(isModVersionCompatibleWithServer('>=0.6.0 <0.8.0 || >=0.7.0-pre.5 <0.7.0', '0.7.1'), true);
+  assert.strictEqual(isModVersionCompatibleWithServer('0.6.0', '0.7.1'), false);
+  assert.strictEqual(isModVersionCompatibleWithServer('2026.04.17-c2d518cc9', '0.7.1'), true);
+  assert.strictEqual(isModVersionCompatibleWithServer('*', '0.7.1'), true);
+
   console.log('  ✓ Strict version compatibility and 3-dot formatting verified');
 
   // Test 17: Hytale PluginIdentifier Canonical Config Sanitization

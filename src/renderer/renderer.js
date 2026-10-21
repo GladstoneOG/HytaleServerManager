@@ -228,9 +228,15 @@ function formatGameVersionLabel(v) {
   return s;
 }
 
+function cleanVerNum(v) {
+  if (!v) return '0';
+  const clean = String(v).replace(/^[v^~>=<\s]+/, '').split('-')[0].trim();
+  return clean || '0';
+}
+
 function compareVersions(v1, v2) {
-  const p1 = String(v1 || '0').split('.').map((n) => parseInt(n, 10) || 0);
-  const p2 = String(v2 || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const p1 = cleanVerNum(v1).split('.').map((n) => parseInt(n, 10) || 0);
+  const p2 = cleanVerNum(v2).split('.').map((n) => parseInt(n, 10) || 0);
   const len = Math.max(p1.length, p2.length);
   for (let i = 0; i < len; i++) {
     const a = p1[i] || 0;
@@ -241,38 +247,106 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
-function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer) {
+function isDateOrBuildTag(v) {
+  if (!v) return false;
+  const c = cleanVerNum(v);
+  const major = parseInt(c.split('.')[0], 10);
+  return major > 100 || /[a-f0-9]{7,}/i.test(String(v));
+}
+
+function checkSingleClause(clause, currentServerVer) {
+  const curClean = cleanVerNum(currentServerVer);
+  const curBranch = curClean.split('.').slice(0, 2).join('.'); // '0.7'
+
+  const tokens = clause.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+
+  for (const rawToken of tokens) {
+    const token = rawToken.trim();
+    if (token === '*' || token.toLowerCase() === 'all') continue;
+    if (isDateOrBuildTag(token)) continue;
+
+    // Caret range: ^0.7.0 -> >= 0.7.0 < 0.8.0
+    if (token.startsWith('^')) {
+      const minVer = cleanVerNum(token.slice(1));
+      const parts = minVer.split('.').map((n) => parseInt(n, 10) || 0);
+      let maxVer = '1.0.0';
+      if (parts[0] === 0) {
+        maxVer = '0.' + ((parts[1] || 0) + 1) + '.0';
+      } else {
+        maxVer = (parts[0] + 1) + '.0.0';
+      }
+      if (compareVersions(curClean, minVer) < 0 || compareVersions(curClean, maxVer) >= 0) {
+        return false;
+      }
+      continue;
+    }
+
+    // Tilde range: ~0.7.0 -> >= 0.7.0 < 0.8.0
+    if (token.startsWith('~')) {
+      const minVer = cleanVerNum(token.slice(1));
+      const parts = minVer.split('.').map((n) => parseInt(n, 10) || 0);
+      const maxVer = (parts[0] || 0) + '.' + ((parts[1] || 0) + 1) + '.0';
+      if (compareVersions(curClean, minVer) < 0 || compareVersions(curClean, maxVer) >= 0) {
+        return false;
+      }
+      continue;
+    }
+
+    if (token.startsWith('>=')) {
+      if (compareVersions(curClean, cleanVerNum(token.slice(2))) < 0) return false;
+      continue;
+    }
+    if (token.startsWith('>')) {
+      if (compareVersions(curClean, cleanVerNum(token.slice(1))) <= 0) return false;
+      continue;
+    }
+    if (token.startsWith('<=')) {
+      if (compareVersions(curClean, cleanVerNum(token.slice(2))) > 0) return false;
+      continue;
+    }
+    if (token.startsWith('<')) {
+      if (compareVersions(curClean, cleanVerNum(token.slice(1))) >= 0) return false;
+      continue;
+    }
+
+    // Exact or branch
+    const cleanToken = cleanVerNum(token);
+    if (cleanToken === curClean) continue;
+    if (token === curBranch || token.startsWith(curBranch + '.') || token.startsWith(curBranch + 'x')) continue;
+    if (token.toLowerCase() === 'early access' && curBranch.toLowerCase() === 'early access') continue;
+
+    // Direct mismatch
+    return false;
+  }
+  return true;
+}
+
+function isModVersionCompatibleWithServer(serverVerSpec, currentServerVer, remoteGameVersions = null) {
   if (!serverVerSpec || serverVerSpec === '*' || serverVerSpec.toLowerCase() === 'all') return true;
   if (!currentServerVer) return true;
 
-  const curClean = String(currentServerVer).trim();
-  const curBranch = curClean.split('.').slice(0, 2).join('.'); // e.g. '0.7'
-  const spec = String(serverVerSpec).trim();
+  const curClean = cleanVerNum(currentServerVer);
+  const curBranch = curClean.split('.').slice(0, 2).join('.');
 
-  // Handle range like ">=0.6.7 <0.8.0"
-  if (spec.includes('<') || spec.includes('>')) {
-    const parts = spec.split(/\s+/);
-    let passes = true;
-    for (const p of parts) {
-      if (p.startsWith('>=')) {
-        if (compareVersions(curClean, p.slice(2)) < 0) passes = false;
-      } else if (p.startsWith('>')) {
-        if (compareVersions(curClean, p.slice(1)) <= 0) passes = false;
-      } else if (p.startsWith('<=')) {
-        if (compareVersions(curClean, p.slice(2)) > 0) passes = false;
-      } else if (p.startsWith('<')) {
-        if (compareVersions(curClean, p.slice(1)) >= 0) passes = false;
-      }
-    }
-    return passes;
+  if (Array.isArray(remoteGameVersions) && remoteGameVersions.length > 0) {
+    const remoteMatches = remoteGameVersions.some((gv) => {
+      const gvClean = String(gv).trim();
+      const gvLower = gvClean.toLowerCase();
+      if (gvClean === '*' || gvLower === 'all') return true;
+      if (gvClean === curClean) return true;
+      if (gvClean === curBranch || gvClean.startsWith(curBranch + '.') || gvClean.startsWith(curBranch + 'x')) return true;
+      if (gvLower === 'early access') return true;
+      return false;
+    });
+    if (remoteMatches) return true;
   }
 
-  // Exact match or branch match
-  if (spec === curClean) return true;
-  if (spec === curBranch || spec.startsWith(curBranch + '.') || spec.startsWith(curBranch + 'x')) return true;
-  if (curBranch.toLowerCase() === 'early access' && spec.toLowerCase() === 'early access') return true;
+  const spec = String(serverVerSpec).trim();
+  if (isDateOrBuildTag(spec)) return true;
 
-  return false;
+  const clauses = spec.split('||');
+  return clauses.some((clause) => checkSingleClause(clause, currentServerVer));
 }
 
 function getModVersionInfo(mod) {
@@ -1119,7 +1193,7 @@ function renderInstalledModsList() {
 
     const currentVer = getCurrentServerVersion();
     const serverVerSpec = m.manifest?.serverVersion;
-    const isComp = isModVersionCompatibleWithServer(serverVerSpec, currentVer);
+    const isComp = isModVersionCompatibleWithServer(serverVerSpec, currentVer, m.latestRemoteFile?.gameVersions);
     const compatTag = (!isComp && serverVerSpec && serverVerSpec !== '*')
       ? `<span class="tag tag-danger" title="This mod was built for Hytale ${escapeHtml(formatGameVersionLabel(serverVerSpec))}, but your server is running ${escapeHtml(currentVer)}.">⚠️ Hytale ${escapeHtml(formatGameVersionLabel(serverVerSpec))}</span>`
       : '';
