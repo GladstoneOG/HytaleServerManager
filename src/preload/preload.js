@@ -48,7 +48,7 @@ contextBridge.exposeInMainWorld('api', {
   getCfCategories: () => ipcRenderer.invoke('cf:categories'),
   getCfMod: (modId) => ipcRenderer.invoke('cf:get-mod', modId),
   getCfDescription: (modId) => ipcRenderer.invoke('cf:get-description', modId),
-  installCfMod: (modObj, fileObj, installDeps) => ipcRenderer.invoke('cf:install', modObj, fileObj, installDeps),
+  installCfMod: (modObj, fileObj, installDeps, targetServerVersion) => ipcRenderer.invoke('cf:install', modObj, fileObj, installDeps, targetServerVersion),
 
   // Thunderstore
   searchThunderstore: (params) => ipcRenderer.invoke('ts:search', params),

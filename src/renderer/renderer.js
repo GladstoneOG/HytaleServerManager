@@ -1691,7 +1691,7 @@ function renderCurseForgeFilteredResults() {
         installBtn.textContent = 'Installing…';
         showModProgress(`Downloading ${mod.name}...`, 10, 'Starting');
         try {
-          const r = await window.api.installCfMod(mod, latestFile, true);
+          const r = await window.api.installCfMod(mod, latestFile, true, currentVer);
           if (r.success) {
             showModProgress(`Installed ${mod.name}`, 100, 'Done');
             hideModProgress(1200);
@@ -1895,7 +1895,7 @@ async function openModModal(mod, latestFile) {
     btn.textContent = 'Installing…';
     showModProgress(`Downloading ${mod.name}...`, 10, 'Starting');
     try {
-      const res = await window.api.installCfMod(mod, targetFile, true);
+      const res = await window.api.installCfMod(mod, targetFile, true, currentVer);
       if (res.success) {
         showModProgress(`Installed ${mod.name}`, 100, 'Done');
         hideModProgress(1200);

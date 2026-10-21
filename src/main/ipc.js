@@ -235,10 +235,11 @@ function registerIpcHandlers({
     return await cfClient.getModDescription(modId);
   });
 
-  ipcMain.handle('cf:install', async (_, modObj, fileObj, installDeps = true) => {
+  ipcMain.handle('cf:install', async (_, modObj, fileObj, installDeps = true, targetServerVersion = null) => {
     try {
       const res = await modManager.installCurseForgeMod(modObj, fileObj, {
         installDeps,
+        targetServerVersion,
         onProgress: (p) => win.webContents.send('mods:action-progress', p),
       });
       return { success: true, ...res };

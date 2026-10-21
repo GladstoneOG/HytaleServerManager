@@ -380,7 +380,7 @@ class ModManager {
   /**
    * Install a mod from CurseForge by file
    */
-  async installCurseForgeMod(modObj, fileObj, { onProgress, signal, installDeps = true } = {}) {
+  async installCurseForgeMod(modObj, fileObj, { onProgress, signal, installDeps = true, targetServerVersion = null } = {}) {
     if (!fileObj.downloadUrl) {
       // Re-query file if URL is missing
       const freshFile = await this.cf.getFile(modObj.id, fileObj.id);
@@ -436,14 +436,28 @@ class ModManager {
       const deps = await this.cf.resolveDependencies(fileObj);
       for (const d of deps) {
         try {
+          // Check if dependency is already installed in the server
+          const currentMeta = await this.loadMetadata();
+          const alreadyInstalled = Object.values(currentMeta.installedMods || {}).some(
+            (m) => m.remoteId === d.mod.id || (m.name || '').toLowerCase() === (d.mod.name || '').toLowerCase()
+          );
+          if (alreadyInstalled) {
+            continue;
+          }
+
+          // Pick the best compatible Release file matching the server version
+          const targetVer = targetServerVersion || (fileObj.gameVersions && fileObj.gameVersions[0]) || null;
+          const depFile = selectBestCurseForgeFile(d.mod, targetVer, false) || d.latestFile;
+
           onProgress?.({
             step: 'dependencies',
             message: `Installing required dependency: ${d.mod.name}...`,
           });
-          const depRes = await this.installCurseForgeMod(d.mod, d.latestFile, {
+          const depRes = await this.installCurseForgeMod(d.mod, depFile, {
             onProgress,
             signal,
             installDeps: false, // Don't infinite-recurse
+            targetServerVersion: targetVer,
           });
           installedDeps.push(depRes);
         } catch (e) {
