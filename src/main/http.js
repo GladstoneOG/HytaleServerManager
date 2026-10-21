@@ -82,7 +82,7 @@ async function downloadFile(urlOrProvider, dest, o = {}) {
   const part = `${dest}.part`;
   let total = o.size || 0;
   let lastErr;
-  let lastTick = 0, lastBytes = 0, speed = 0;
+  let lastTick = 0, lastBytes = 0, speed = 0, lastPct = 0;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (signal?.aborted) throw new Error('Download cancelled');
@@ -126,14 +126,20 @@ async function downloadFile(urlOrProvider, dest, o = {}) {
           done += chunk.length;
           if (!out.write(chunk)) { stream.pause(); out.once('drain', () => stream.resume()); }
           const now = Date.now();
-          if (now - lastTick > 400) {
-            if (lastTick) speed = ((done - lastBytes) * 1000) / (now - lastTick);
-            lastTick = now; lastBytes = done;
-            onProgress?.({ done, total, speed });
+          const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+          if (now - lastTick >= 50 || (total > 0 && pct - lastPct >= 2) || (total > 0 && done === total)) {
+            if (lastTick) speed = ((done - lastBytes) * 1000) / Math.max(1, now - lastTick);
+            lastTick = now;
+            lastBytes = done;
+            lastPct = pct;
+            onProgress?.({ done, total, speed, percent: pct });
           }
         });
         stream.on('error', (e) => { out.destroy(); reject(e); });
-        stream.on('end', () => out.end(resolve));
+        stream.on('end', () => {
+          onProgress?.({ done, total: total || done, speed, percent: 100 });
+          out.end(resolve);
+        });
         out.on('error', reject);
       });
       clearTimeout(idle);
@@ -153,7 +159,7 @@ async function downloadFile(urlOrProvider, dest, o = {}) {
     await sleep(backoff(Math.min(attempt, 4)));
   }
 
-  onProgress?.({ done: total, total, speed, verifying: !!(o.sha256 || o.sha1) });
+  onProgress?.({ done: total, total, speed, percent: 100, verifying: !!(o.sha256 || o.sha1) });
   if (o.sha256 || o.sha1) {
     const algo = o.sha256 ? 'sha256' : 'sha1';
     const want = (o.sha256 || o.sha1).toLowerCase();

@@ -397,14 +397,22 @@ class ModManager {
 
     onProgress?.({
       step: 'downloading',
-      message: `Downloading ${modObj.name} (${fileName})...`,
+      modName: modObj.name,
+      fileName,
+      percent: 5,
+      message: `Downloading ${modObj.name}...`,
     });
 
     await downloadFile(fileObj.downloadUrl, targetPath, {
+      size: fileObj.fileLength || 0,
       onProgress: (p) => {
+        const pct = p.percent ?? (p.total > 0 ? Math.round((p.done / p.total) * 100) : 0);
         onProgress?.({
           step: 'downloading',
-          message: `Downloading ${modObj.name}: ${p.done ? (p.done / 1024).toFixed(0) : 0} KB`,
+          modName: modObj.name,
+          fileName,
+          percent: pct,
+          message: `Downloading ${modObj.name} (${pct}%)...`,
           ...p,
         });
       },

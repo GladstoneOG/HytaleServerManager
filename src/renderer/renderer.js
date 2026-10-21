@@ -322,9 +322,10 @@ function showModProgress(title, percent, detail = '') {
     spinner.style.display = percent >= 100 ? 'none' : 'inline-block';
   }
   if (modActionTitle) modActionTitle.textContent = title;
-  if (modActionStats) modActionStats.textContent = detail || (typeof percent === 'number' ? `${percent}%` : '');
-  if (modActionFill && typeof percent === 'number') {
-    modActionFill.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+  const numPct = typeof percent === 'number' ? Math.min(100, Math.max(0, percent)) : 0;
+  if (modActionStats) modActionStats.textContent = detail || `${numPct}%`;
+  if (modActionFill) {
+    modActionFill.style.width = `${numPct}%`;
   }
 }
 
@@ -2223,20 +2224,24 @@ window.api.onModActionProgress((p) => {
   if (!p) return;
   const modName = p.modName || p.fileName || 'Mod';
   let pct = 0;
-  if (p.total && p.done) {
-    pct = Math.min(100, Math.round((p.done / p.total) * 100));
-  } else if (typeof p.percent === 'number') {
+  if (typeof p.percent === 'number' && p.percent > 0) {
     pct = p.percent;
+  } else if (p.total && p.done) {
+    pct = Math.min(100, Math.round((p.done / p.total) * 100));
   }
 
   if (p.step === 'downloading') {
     const speedText = p.speed ? ` • ${(p.speed / 1024).toFixed(0)} KB/s` : '';
-    const sizeText = p.total && p.done ? `${(p.done / 1048576).toFixed(1)} MB / ${(p.total / 1048576).toFixed(1)} MB` : `${pct}%`;
+    const sizeText = p.total && p.done
+      ? `${(p.done / 1048576).toFixed(1)} MB / ${(p.total / 1048576).toFixed(1)} MB`
+      : p.done
+      ? `${(p.done / 1024).toFixed(0)} KB`
+      : `${pct}%`;
     showModProgress(p.message || `Downloading ${modName}...`, pct, `${sizeText}${speedText}`);
   } else if (p.step === 'dependencies') {
-    showModProgress(p.message || `Resolving dependencies...`, 50, 'Dependencies');
+    showModProgress(p.message || `Resolving dependencies...`, p.percent || 40, 'Dependencies');
   } else if (p.step === 'extracting' || p.step === 'installing') {
-    showModProgress(p.message || `Installing ${modName}...`, 85, 'Extracting');
+    showModProgress(p.message || `Installing ${modName}...`, p.percent || 85, 'Extracting');
   } else if (p.step === 'complete' || p.step === 'done') {
     showModProgress(p.message || `Completed!`, 100, 'Done');
     showToast(p.message || `Completed ${modName}`, 'success');

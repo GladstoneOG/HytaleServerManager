@@ -114,10 +114,33 @@ class ThunderstoreClient {
     const tmpZip = path.join(os.tmpdir(), `ts_${namespace}_${name}_${version}_${Date.now()}.zip`);
 
     try {
+      onProgress?.({
+        step: 'downloading',
+        modName: name,
+        percent: 5,
+        message: `Connecting to Thunderstore for ${name}...`,
+      });
+
       await downloadFile(dlUrl, tmpZip, {
-        onProgress,
+        onProgress: (p) => {
+          const pct = p.percent ?? (p.total > 0 ? Math.round((p.done / p.total) * 100) : 0);
+          onProgress?.({
+            step: 'downloading',
+            modName: name,
+            percent: pct,
+            message: `Downloading ${name} (${pct}%)...`,
+            ...p,
+          });
+        },
         signal,
         retries: 5,
+      });
+
+      onProgress?.({
+        step: 'extracting',
+        modName: name,
+        percent: 90,
+        message: `Extracting ${name}...`,
       });
 
       // Inspect entries in zip to see where .jar files are located
