@@ -12,14 +12,14 @@ const os = require('os');
 const crypto = require('crypto');
 const { exists, writeJsonAtomic } = require('./util');
 
-let electronSafeStorage = null;
-try {
-  const electron = require('electron');
-  if (electron && electron.safeStorage && electron.safeStorage.isEncryptionAvailable()) {
-    electronSafeStorage = electron.safeStorage;
-  }
-} catch {
-  // Headless Node environment
+function getSafeStorage() {
+  try {
+    const electron = require('electron');
+    if (electron && electron.safeStorage && electron.safeStorage.isEncryptionAvailable()) {
+      return electron.safeStorage;
+    }
+  } catch {}
+  return null;
 }
 
 // Derive a machine/user-bound key for fallback AES-256-GCM encryption
@@ -34,9 +34,10 @@ function getFallbackKey() {
  * Encrypt a plaintext string into a secure Buffer with type header
  */
 function encryptData(plainText) {
-  if (electronSafeStorage) {
+  const safeStorage = getSafeStorage();
+  if (safeStorage) {
     try {
-      const encrypted = electronSafeStorage.encryptString(plainText);
+      const encrypted = safeStorage.encryptString(plainText);
       const prefix = Buffer.from('SAFE:');
       return Buffer.concat([prefix, encrypted]);
     } catch {
@@ -65,13 +66,16 @@ function decryptData(buffer) {
 
   const prefix = buffer.subarray(0, 5).toString('utf8');
   const payload = buffer.subarray(5);
+  const safeStorage = getSafeStorage();
 
-  if (prefix === 'SAFE:' && electronSafeStorage) {
-    return electronSafeStorage.decryptString(payload);
+  if (prefix === 'SAFE:' && safeStorage) {
+    try {
+      return safeStorage.decryptString(payload);
+    } catch {}
   }
 
   if (prefix === 'GCM:' || buffer.subarray(0, 4).toString('utf8') === 'GCM:') {
-    const raw = buffer.subarray(4);
+    const raw = prefix === 'GCM:' ? payload : buffer.subarray(4);
     const iv = raw.subarray(0, 12);
     const tag = raw.subarray(12, 28);
     const enc = raw.subarray(28);
@@ -83,9 +87,9 @@ function decryptData(buffer) {
   }
 
   // Attempt raw safeStorage decrypt
-  if (electronSafeStorage) {
+  if (safeStorage) {
     try {
-      return electronSafeStorage.decryptString(buffer);
+      return safeStorage.decryptString(buffer);
     } catch {}
   }
 

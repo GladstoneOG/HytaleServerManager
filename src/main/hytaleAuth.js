@@ -9,6 +9,7 @@
  */
 const path = require('path');
 const fsp = require('fs/promises');
+const os = require('os');
 const { getJson, postForm, postJson, request } = require('./http');
 const { readJson, writeJsonAtomic, exists, sleep } = require('./util');
 const { loadSecureCredentials, saveSecureCredentials } = require('./secureStorage');
@@ -33,7 +34,7 @@ class HytaleAuthManager {
   }
 
   /**
-   * Find .hytale-downloader-credentials.enc or legacy .json in server directory or parent directories
+   * Find .hytale-downloader-credentials.enc or legacy .json across server, userData, and home directories
    */
   async findCredentialsFile() {
     if (this.credentialsPath && await exists(this.credentialsPath)) {
@@ -41,15 +42,43 @@ class HytaleAuthManager {
     }
 
     const candidates = [];
+
+    // 1. Check Electron userData directory (%APPDATA%\hytale-server-manager)
+    try {
+      const { app } = require('electron');
+      if (app && app.getPath) {
+        const userData = app.getPath('userData');
+        if (userData) {
+          candidates.push(path.join(userData, '.hytale-downloader-credentials.enc'));
+          candidates.push(path.join(userData, '.hytale-downloader-credentials.json'));
+        }
+      }
+    } catch {}
+
+    // 2. Check server directory and safe parent directory (avoiding root drive like C:\)
     if (this.serverDir) {
       candidates.push(path.join(this.serverDir, '.hytale-downloader-credentials.enc'));
-      candidates.push(path.join(path.dirname(this.serverDir), '.hytale-downloader-credentials.enc'));
-      candidates.push(path.join(path.dirname(path.dirname(this.serverDir)), '.hytale-downloader-credentials.enc'));
       candidates.push(path.join(this.serverDir, '.hytale-downloader-credentials.json'));
-      candidates.push(path.join(path.dirname(this.serverDir), '.hytale-downloader-credentials.json'));
-      candidates.push(path.join(path.dirname(path.dirname(this.serverDir)), '.hytale-downloader-credentials.json'));
+
+      const parentDir = path.dirname(this.serverDir);
+      if (parentDir && parentDir !== this.serverDir && path.dirname(parentDir) !== parentDir) {
+        candidates.push(path.join(parentDir, '.hytale-downloader-credentials.enc'));
+        candidates.push(path.join(parentDir, '.hytale-downloader-credentials.json'));
+      }
     }
-    // Also check standard F:\serverht
+
+    // 3. Check user profile / home directory
+    try {
+      const home = os.homedir();
+      if (home) {
+        candidates.push(path.join(home, '.hytale', '.hytale-downloader-credentials.enc'));
+        candidates.push(path.join(home, '.hytale', '.hytale-downloader-credentials.json'));
+        candidates.push(path.join(home, '.hytale-downloader-credentials.enc'));
+        candidates.push(path.join(home, '.hytale-downloader-credentials.json'));
+      }
+    } catch {}
+
+    // 4. Default standard locations
     candidates.push('F:\\serverht\\.hytale-downloader-credentials.enc');
     candidates.push('F:\\serverht\\.hytale-downloader-credentials.json');
 
@@ -95,9 +124,26 @@ class HytaleAuthManager {
   async saveCredentials(creds) {
     let file = await this.findCredentialsFile();
     if (!file) {
-      // Default to server parent directory or server directory
-      const baseDir = this.serverDir ? path.dirname(this.serverDir) : 'F:\\serverht';
-      file = path.join(baseDir, '.hytale-downloader-credentials.enc');
+      // 1. Prefer serverDir if exists
+      if (this.serverDir && (await exists(this.serverDir))) {
+        file = path.join(this.serverDir, '.hytale-downloader-credentials.enc');
+      } else {
+        // 2. Prefer Electron userData (always writable for current user)
+        try {
+          const { app } = require('electron');
+          if (app && app.getPath) {
+            const userData = app.getPath('userData');
+            if (userData) {
+              file = path.join(userData, '.hytale-downloader-credentials.enc');
+            }
+          }
+        } catch {}
+
+        // 3. Fallback to os.homedir()
+        if (!file) {
+          file = path.join(os.homedir(), '.hytale-downloader-credentials.enc');
+        }
+      }
     }
 
     const savedPath = await saveSecureCredentials(file, creds);
@@ -354,17 +400,27 @@ class HytaleAuthManager {
   }
 
   /**
-   * Get account status summary
+   * Get account status summary, automatically refreshing token if expired
    */
   async getStatus() {
-    const creds = await this.loadCredentials();
+    let creds = await this.loadCredentials();
     if (!creds || !creds.access_token) {
       return { authenticated: false, credentialsPath: this.credentialsPath };
     }
 
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = creds.expires_at || 0;
-    const isExpired = expiresAt > 0 && expiresAt <= now;
+    let isExpired = expiresAt > 0 && expiresAt <= now;
+
+    // Automatically refresh OAuth token in the background if expired or close to expiry (< 5 min)
+    if ((isExpired || (expiresAt > 0 && expiresAt - now < 300)) && creds.refresh_token) {
+      try {
+        creds = await this.refreshToken(creds.refresh_token);
+        isExpired = false;
+      } catch (e) {
+        console.warn('[Auth] Automatic token refresh failed during getStatus:', e.message);
+      }
+    }
 
     const profile = await this.resolveAccountProfile(creds);
 
