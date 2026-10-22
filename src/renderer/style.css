@@ -1142,6 +1142,20 @@ summary,
   font-size: 12px;
 }
 
+.terminal-notice-action {
+  background: rgba(245, 158, 11, 0.12);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.28);
+  color: #fde68a;
+  justify-content: space-between;
+}
+
+.terminal-notice-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .terminal-body {
   flex: 1;
   min-height: 0;

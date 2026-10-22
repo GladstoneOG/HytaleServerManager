@@ -47,6 +47,12 @@ const dashInstalledVer = $('dash-installed-ver');
 const dashUpstreamVer = $('dash-upstream-ver');
 const dashActiveProfile = $('dash-active-profile');
 const dashServerDir = $('dash-server-dir');
+const dashAuthMode = $('dash-auth-mode');
+const dashServerSession = $('dash-server-session');
+const serverAuthWarningBanner = $('server-auth-warning-banner');
+const serverAuthWarningText = $('server-auth-warning-text');
+const btnBannerAuthServer = $('btn-banner-auth-server');
+const btnBannerSwitchInsecure = $('btn-banner-switch-insecure');
 const dashAuthUserTitle = $('dash-auth-user-title');
 const dashAuthBadge = $('dash-auth-status-badge');
 const dashAuthDesc = $('dash-auth-desc');
@@ -59,6 +65,11 @@ const consoleLaunchMode = $('console-launch-mode');
 const btnClearConsole = $('btn-clear-console');
 const detachedModeNotice = $('detached-mode-notice');
 const detachedModeText = $('detached-mode-text');
+const consoleDeviceAuthBanner = $('console-device-auth-banner');
+const consoleDeviceAuthText = $('console-device-auth-text');
+const btnConsoleCopyCode = $('btn-console-copy-code');
+const consoleAuthCodeVal = $('console-auth-code-val');
+const btnConsoleOpenAuthUrl = $('btn-console-open-auth-url');
 const consoleOutput = $('console-output');
 const consoleJump = $('console-jump');
 const consoleInputForm = $('console-input-form');
@@ -128,6 +139,9 @@ const btnBrowseServerDir = $('btn-browse-server-dir');
 const settingsMaxRam = $('settings-max-ram');
 const settingsLaunchMode = $('settings-launch-mode');
 const settingsPatchline = $('settings-patchline');
+const settingsAuthMode = $('settings-auth-mode');
+const settingsServerAuthDesc = $('settings-server-auth-desc');
+const btnAuthenticateServer = $('btn-authenticate-server');
 const settingsCloseAction = $('settings-close-action');
 const settingsLoginItem = $('settings-login-item');
 const settingRowStartupBehavior = $('setting-row-startup-behavior');
@@ -692,6 +706,7 @@ async function init() {
     // Parallel non-blocking initial data loads
     await Promise.all([
       refreshServerStatus(),
+      refreshServerAuthStatus(),
       refreshAccountStatus(),
       checkServerVersion(),
       loadInstalledMods(true),
@@ -731,6 +746,9 @@ function applyConfigToUI() {
   const mode = appConfig.launchMode || 'integrated';
   setSegmentedValue(consoleLaunchMode, mode);
   setSegmentedValue(settingsLaunchMode, mode);
+
+  const authMode = appConfig.authMode || 'authenticated';
+  setSegmentedValue(settingsAuthMode, authMode);
 }
 
 async function saveConfigPatch(patch) {
@@ -2357,6 +2375,62 @@ function setToggleButtonsState(running, busyText = null) {
   });
 }
 
+let lastServerAuth = null;
+
+async function refreshServerAuthStatus() {
+  try {
+    const auth = await window.api.getServerAuthStatus();
+    lastServerAuth = auth;
+    if (!auth) return;
+
+    // 1. Dashboard Auth Mode
+    if (dashAuthMode) {
+      if (auth.authMode === 'insecure') {
+        dashAuthMode.innerHTML = '<span class="tag tag-warning tag-sm">Insecure (Direct)</span>';
+      } else {
+        dashAuthMode.innerHTML = '<span class="tag tag-sm">Authenticated</span>';
+      }
+    }
+
+    // 2. Dashboard Server Session Badge
+    if (dashServerSession) {
+      if (auth.authMode === 'insecure') {
+        dashServerSession.innerHTML = '<span class="tag tag-muted tag-sm">Bypassed</span>';
+      } else if (auth.authenticated) {
+        const idText = auth.profileUuid ? `${auth.profileUuid.substring(0, 8)}...` : 'Active';
+        dashServerSession.innerHTML = `<span class="tag tag-success tag-sm" title="Session token active">Active (${idText})</span>`;
+      } else if (auth.authStoreExists) {
+        dashServerSession.innerHTML = '<span class="tag tag-error tag-sm" title="Credentials present but key mismatch across computers">Key Mismatch ⚠️</span>';
+      } else {
+        dashServerSession.innerHTML = '<span class="tag tag-error tag-sm" title="Server session unavailable - remote players cannot join">Not Authenticated ⚠️</span>';
+      }
+    }
+
+    // 3. Settings Server Auth Description
+    if (settingsServerAuthDesc) {
+      if (auth.authMode === 'insecure') {
+        settingsServerAuthDesc.textContent = 'Insecure mode active: session token requirement is bypassed. Direct connections permitted.';
+      } else if (auth.authenticated) {
+        settingsServerAuthDesc.textContent = 'Authenticated. Server credentials present and valid for remote connections.';
+      } else if (auth.authStoreExists) {
+        settingsServerAuthDesc.textContent = 'Credentials present in auth.enc but encrypted with different hardware ID. Click Authenticate to re-link.';
+      } else {
+        settingsServerAuthDesc.textContent = 'Server has no stored credentials. Remote players will be rejected unless authenticated.';
+      }
+    }
+
+    // 4. Dashboard Warning Banner
+    if (serverAuthWarningBanner) {
+      const running = Boolean(lastServerStatus?.isRunning);
+      if (running && auth.authMode === 'authenticated' && !auth.authenticated) {
+        serverAuthWarningBanner.classList.remove('hidden');
+      } else if (auth.authMode !== 'authenticated' || auth.authenticated || !running) {
+        serverAuthWarningBanner.classList.add('hidden');
+      }
+    }
+  } catch {}
+}
+
 function updateServerStatusUI(status) {
   lastServerStatus = status || { isRunning: false };
   const running = Boolean(status?.isRunning);
@@ -2368,6 +2442,7 @@ function updateServerStatusUI(status) {
   heroDot.classList.toggle('is-online', running);
 
   setToggleButtonsState(running);
+  refreshServerAuthStatus();
 
   if (running) {
     topbarStatusText.textContent = status.isDetached ? `Running · PID ${status.pid}` : 'Running';
@@ -2681,6 +2756,126 @@ if (btnCreateShortcut) {
     }
   });
 }
+
+// Server Authentication Mode & Device Auth Flow
+bindSegmentedControl(settingsAuthMode, async (val) => {
+  await window.api.setAuthMode(val);
+  await saveConfigPatch({ authMode: val });
+  await refreshServerAuthStatus();
+  showToast(
+    val === 'insecure'
+      ? 'Switched to Insecure Mode (Direct connect, no Hytale account required)'
+      : 'Switched to Authenticated Mode (Official Hytale account required)',
+    'info'
+  );
+});
+
+if (btnAuthenticateServer) {
+  btnAuthenticateServer.addEventListener('click', async () => {
+    const st = await window.api.getServerStatus();
+    if (!st.isRunning) {
+      showToast('Please start the server first to perform authentication.', 'info');
+      return;
+    }
+    btnAuthenticateServer.disabled = true;
+    showToast('Sending /auth login device to server console...', 'info');
+    const res = await window.api.authenticateServer();
+    if (res && res.error) {
+      showToast(res.error, 'error');
+    }
+    setTimeout(() => {
+      btnAuthenticateServer.disabled = false;
+    }, 3000);
+  });
+}
+
+if (btnBannerAuthServer) {
+  btnBannerAuthServer.addEventListener('click', async () => {
+    const st = await window.api.getServerStatus();
+    if (!st.isRunning) {
+      showToast('Starting server...', 'info');
+      await toggleServer();
+    }
+    switchTab('console');
+    await window.api.authenticateServer();
+  });
+}
+
+if (btnBannerSwitchInsecure) {
+  btnBannerSwitchInsecure.addEventListener('click', async () => {
+    await window.api.setAuthMode('insecure');
+    await saveConfigPatch({ authMode: 'insecure' });
+    if (serverAuthWarningBanner) {
+      serverAuthWarningBanner.classList.add('hidden');
+    }
+    await refreshServerAuthStatus();
+    showToast('Switched to Insecure mode! Restart server if it is running to apply.', 'success');
+  });
+}
+
+let activeAuthUrl = null;
+window.api.onServerAuthDeviceCode((data) => {
+  if (consoleDeviceAuthBanner) {
+    consoleDeviceAuthBanner.classList.remove('hidden');
+  }
+  if (consoleAuthCodeVal && data.userCode) {
+    consoleAuthCodeVal.textContent = data.userCode;
+  }
+  activeAuthUrl = data.verificationUrlComplete || data.verificationUrl;
+  if (data.verificationUrlComplete) {
+    window.api.openExternal(data.verificationUrlComplete).catch(() => {});
+  }
+  showToast(`Authorization code: ${data.userCode}. Approve in your browser to complete server login.`, 'info');
+});
+
+if (btnConsoleOpenAuthUrl) {
+  btnConsoleOpenAuthUrl.addEventListener('click', () => {
+    if (activeAuthUrl) {
+      window.api.openExternal(activeAuthUrl).catch(() => {});
+    }
+  });
+}
+
+if (btnConsoleCopyCode) {
+  btnConsoleCopyCode.addEventListener('click', async () => {
+    const code = consoleAuthCodeVal?.textContent;
+    if (code && code !== '----') {
+      try {
+        await navigator.clipboard.writeText(code);
+        showToast(`Copied code ${code} to clipboard!`, 'success');
+      } catch {
+        showToast(`Code: ${code}`, 'info');
+      }
+    }
+  });
+}
+
+window.api.onServerAuthStatusChange(async (data) => {
+  if (data.authenticated) {
+    if (consoleDeviceAuthBanner) {
+      consoleDeviceAuthBanner.classList.add('hidden');
+    }
+    if (serverAuthWarningBanner) {
+      serverAuthWarningBanner.classList.add('hidden');
+    }
+    await refreshServerAuthStatus();
+    showToast('Server authenticated successfully! Remote players can now connect.', 'success');
+  }
+});
+
+window.api.onServerAuthProfile(async () => {
+  await refreshServerAuthStatus();
+});
+
+window.api.onServerAuthWarning(async (data) => {
+  if (serverAuthWarningBanner) {
+    serverAuthWarningBanner.classList.remove('hidden');
+  }
+  if (serverAuthWarningText && data.message) {
+    serverAuthWarningText.textContent = data.message;
+  }
+  await refreshServerAuthStatus();
+});
 
 // Boot
 init();

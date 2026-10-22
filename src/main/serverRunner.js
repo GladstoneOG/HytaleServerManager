@@ -13,6 +13,7 @@ const { spawn, exec, execFile } = require('child_process');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { exists } = require('./util');
+const { ensureServerAuthKey } = require('./serverAuth');
 
 /**
  * Convert Hytale server's UTC timestamps [YYYY/MM/DD HH:mm:ss LEVEL] to the local PC timezone
@@ -239,11 +240,13 @@ class ServerRunner extends EventEmitter {
    * @param {string} [options.mode='integrated'] 'integrated' (pipes to UI) or 'detached' (independent window)
    * @param {Array<string>} [options.jvmOptions]
    * @param {Array<string>} [options.extraArgs]
+   * @param {string} [options.authMode='authenticated'] 'authenticated' or 'insecure'
    */
   async startServer({
     mode = 'integrated',
     jvmOptions = ['-Xms4G', '-Xmx6G', '-XX:+UseG1GC'],
     extraArgs = [],
+    authMode = 'authenticated',
   } = {}) {
     if (this.isRunning) {
       throw new Error('Server is already running');
@@ -254,12 +257,20 @@ class ServerRunner extends EventEmitter {
       throw new Error(`HytaleServer.jar not found at ${jarPath}`);
     }
 
+    // Ensure portable server auth key is loaded or generated
+    const authKey = await ensureServerAuthKey(this.serverDir);
+
     // Determine assets path
     let assetsPath = 'Assets.zip';
     if (await exists(path.join(this.serverDir, 'Assets.zip'))) {
       assetsPath = 'Assets.zip';
     } else if (await exists(path.join(path.dirname(this.serverDir), 'Assets.zip'))) {
       assetsPath = path.join('..', 'Assets.zip');
+    }
+
+    const finalExtraArgs = [...extraArgs];
+    if (!finalExtraArgs.includes('--auth-mode')) {
+      finalExtraArgs.push('--auth-mode', authMode);
     }
 
     const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -270,8 +281,13 @@ class ServerRunner extends EventEmitter {
       'HytaleServer.jar',
       '--assets',
       assetsPath,
-      ...extraArgs,
+      ...finalExtraArgs,
     ];
+
+    const childEnv = {
+      ...process.env,
+      HYTALE_AUTH_KEY: authKey || process.env.HYTALE_AUTH_KEY || '',
+    };
 
     if (mode === 'detached') {
       // Launch in an independent Windows Terminal / Command Prompt window
@@ -282,6 +298,7 @@ class ServerRunner extends EventEmitter {
 
       const child = spawn('cmd.exe', ['/c', 'start', 'Hytale Server Main', 'java', ...javaArgs], {
         cwd: this.serverDir,
+        env: childEnv,
         detached: true,
         stdio: 'ignore',
         windowsHide: false,
@@ -317,6 +334,7 @@ class ServerRunner extends EventEmitter {
 
     this.process = spawn('java', javaArgs, {
       cwd: this.serverDir,
+      env: childEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: true,
       shell: false,
@@ -360,12 +378,55 @@ class ServerRunner extends EventEmitter {
       }
     };
 
+    const checkLogForAuth = (text) => {
+      // 1. Device Code flow detection
+      const codeMatch = /Enter code:\s*([A-Za-z0-9-]+)/i.exec(text);
+      const urlMatch = /Visit:\s*(https:\/\/[^\s\r\n]+)/i.exec(text);
+      const orVisitMatch = /Or visit:\s*(https:\/\/[^\s\r\n]+)/i.exec(text);
+
+      if (codeMatch || orVisitMatch) {
+        const userCode = codeMatch ? codeMatch[1].trim() : null;
+        const verificationUrl = urlMatch ? urlMatch[1].trim() : 'https://oauth.accounts.hytale.com/device';
+        const verificationUrlComplete = orVisitMatch
+          ? orVisitMatch[1].trim()
+          : (userCode ? `${verificationUrl}?user_code=${encodeURIComponent(userCode)}` : verificationUrl);
+        this.emit('auth-device-code', {
+          userCode,
+          verificationUrl,
+          verificationUrlComplete,
+        });
+      }
+
+      // 2. Auth Success detection
+      if (/Authentication successful!/i.test(text) || /Session restored from stored credentials/i.test(text)) {
+        this.emit('auth-status-change', { authenticated: true });
+      }
+      const profileMatch = /Auto-selected profile:\s*([^\s(]+)\s*\(([^)]+)\)/i.exec(text);
+      if (profileMatch) {
+        this.emit('auth-profile', { profileName: profileMatch[1], profileUuid: profileMatch[2] });
+      }
+
+      // 3. Auth Warning detection
+      if (
+        /Server session token not available - cannot request auth grant/i.test(text) ||
+        /client\.general\.disconnect\.serverAuthUnavailable/i.test(text) ||
+        /No server tokens configured\. Use \/auth login/i.test(text) ||
+        /Failed to decrypt credentials from auth\.enc/i.test(text)
+      ) {
+        this.emit('auth-warning', {
+          type: 'unauthenticated',
+          message: 'Server session token unavailable. Remote players are being disconnected with authentication errors.',
+        });
+      }
+    };
+
     this.process.stdout.on('data', (chunk) => {
       const rawText = chunk.toString('utf8');
       const text = convertTimestampToLocal(rawText);
       this._appendLog(text);
       this.emit('log', { type: 'stdout', text });
       checkLogForReady(rawText);
+      checkLogForAuth(rawText);
     });
 
     this.process.stderr.on('data', (chunk) => {
@@ -373,6 +434,7 @@ class ServerRunner extends EventEmitter {
       const text = convertTimestampToLocal(rawText);
       this._appendLog(text);
       this.emit('log', { type: 'stderr', text });
+      checkLogForAuth(rawText);
     });
 
     const handleExit = (code, signal, eventName) => {
@@ -424,6 +486,18 @@ class ServerRunner extends EventEmitter {
         this.process.unref();
       } catch {}
     }
+  }
+
+  /**
+   * Request official server authentication device flow
+   */
+  authenticateServer() {
+    if (!this.isRunning) {
+      throw new Error('Server must be running to authenticate. Please start the server first.');
+    }
+    this._appendLog('[Manager] Requesting server device authentication (/auth login device)...\n');
+    this.sendCommand('/auth login device');
+    return { success: true };
   }
 
   /**

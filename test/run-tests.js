@@ -4,6 +4,7 @@
  */
 const assert = require('assert');
 const path = require('path');
+const fs = require('fs');
 const { compareVersions, hashFile, safeName, isModVersionCompatibleWithServer, formatGameVersionLabel } = require('../src/main/util');
 const { murmur2, normalize, curseforgeFingerprint } = require('../src/main/murmur2');
 const { CurseForgeClient } = require('../src/main/curseforge');
@@ -454,7 +455,30 @@ async function run() {
   assert.strictEqual(isYungComp, true, "YUNG's HyDungeons must not fail compatibility check");
   console.log('  ✓ Early Access mods handled as tentative and will display "Early Access" tag');
 
-  console.log('\n🎉 ALL 22 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 23: Portable Server Auth Key & Server Auth Status Detection
+  console.log('Test 23: Portable Server Auth Key & Credential Store Decryption');
+  const { ensureServerAuthKey, readServerStoredCredentials, getServerAuthSummary } = require('../src/main/serverAuth');
+  const tempTestDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'hytale_auth_test_'));
+  try {
+    const generatedKey = await ensureServerAuthKey(tempTestDir);
+    assert(generatedKey && typeof generatedKey === 'string', 'Generated key must be a valid string');
+    const keyFileExists = fs.existsSync(path.join(tempTestDir, 'auth.enc.key'));
+    assert(keyFileExists, 'auth.enc.key must be written to disk');
+    const readBackKey = await ensureServerAuthKey(tempTestDir);
+    assert.strictEqual(readBackKey, generatedKey, 'Subsequent ensureServerAuthKey must return the same key');
+
+    // Test decryption on real server dir
+    const realAuthSummary = await getServerAuthSummary('F:\\serverht\\Server');
+    assert.strictEqual(realAuthSummary.authKeyPresent, true, 'Real server directory must have auth key present');
+    assert.strictEqual(realAuthSummary.authenticated, true, 'Real server credentials must be decryptable with portable key');
+    assert.strictEqual(realAuthSummary.clientId, undefined, 'ClientId property is encapsulated');
+    assert(realAuthSummary.profileUuid, 'ProfileUuid must be extracted');
+    console.log(`  ✓ Decrypted server credentials cleanly: Profile ${realAuthSummary.profileUuid}, Authenticated: ${realAuthSummary.authenticated}`);
+  } finally {
+    await fsp.rm(tempTestDir, { recursive: true, force: true }).catch(() => {});
+  }
+
+  console.log('\n🎉 ALL 23 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {

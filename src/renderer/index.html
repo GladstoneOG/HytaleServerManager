@@ -139,6 +139,18 @@
               </div>
             </div>
 
+            <div id="server-auth-warning-banner" class="callout callout-warning hidden">
+              <div class="callout-icon"><svg class="ic"><use href="#i-alert"/></svg></div>
+              <div class="callout-body">
+                <div class="callout-title">Server Session Token Unavailable</div>
+                <div class="callout-text" id="server-auth-warning-text">Remote players cannot connect because the server has not established an authenticated session with Hytale. Authenticate your server or switch to Insecure mode.</div>
+              </div>
+              <div class="callout-actions">
+                <button id="btn-banner-auth-server" class="btn btn-primary btn-sm">Authenticate Server</button>
+                <button id="btn-banner-switch-insecure" class="btn btn-ghost btn-sm">Switch to Insecure Mode</button>
+              </div>
+            </div>
+
             <!-- Hero -->
             <div class="hero card">
               <div class="hero-main">
@@ -207,6 +219,8 @@
                   <div><dt>Version</dt><dd id="dash-installed-ver"><span class="skeleton-text"></span></dd></div>
                   <div><dt>Latest</dt><dd id="dash-upstream-ver"><span class="skeleton-text"></span></dd></div>
                   <div><dt>Profile</dt><dd id="dash-active-profile">Default</dd></div>
+                  <div><dt>Auth Mode</dt><dd id="dash-auth-mode"><span class="tag tag-sm">Authenticated</span></dd></div>
+                  <div><dt>Server Session</dt><dd id="dash-server-session"><span class="tag tag-sm">Checking…</span></dd></div>
                   <div><dt>Folder</dt><dd><button id="dash-server-dir" class="link-btn mono truncate" title="Open folder">—</button></dd></div>
                 </dl>
               </div>
@@ -253,6 +267,17 @@
 
             <div id="detached-mode-notice" class="terminal-notice hidden">
               <svg class="ic"><use href="#i-info"/></svg><span id="detached-mode-text"></span>
+            </div>
+
+            <div id="console-device-auth-banner" class="terminal-notice terminal-notice-action hidden">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <svg class="ic ic-accent"><use href="#i-link"/></svg>
+                <span id="console-device-auth-text">Server Authorization Required: Approve in browser to authenticate server.</span>
+              </div>
+              <div class="terminal-notice-btns">
+                <button id="btn-console-copy-code" class="btn btn-secondary btn-xs">Copy Code (<span id="console-auth-code-val">----</span>)</button>
+                <button id="btn-console-open-auth-url" class="btn btn-primary btn-xs">Open Browser</button>
+              </div>
             </div>
 
             <div class="terminal-body">
@@ -509,6 +534,27 @@
                       <option value="release">Release</option>
                       <option value="pre-release">Pre-release</option>
                     </select>
+                  </div>
+                </div>
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Authentication mode</div>
+                    <div class="setting-desc">Authenticated requires official Hytale accounts. Insecure bypasses session tokens (ideal for LAN & Tailscale).</div>
+                  </div>
+                  <div class="setting-control">
+                    <div class="segmented segmented-sm" id="settings-auth-mode" role="radiogroup" aria-label="Authentication mode">
+                      <button data-value="authenticated" class="active" role="radio" title="Official Hytale online auth">Authenticated</button>
+                      <button data-value="insecure" role="radio" title="Direct connect without Hytale auth grants">Insecure</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Server account session</div>
+                    <div id="settings-server-auth-desc" class="setting-desc">Status: Checking…</div>
+                  </div>
+                  <div class="setting-control">
+                    <button id="btn-authenticate-server" class="btn btn-secondary btn-sm">Authenticate Server</button>
                   </div>
                 </div>
               </div>

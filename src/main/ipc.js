@@ -7,6 +7,7 @@ const { app, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fsp = require('fs/promises');
 const { readJson, writeJsonAtomic, ensureDir } = require('./util');
+const { getServerAuthSummary } = require('./serverAuth');
 
 function registerIpcHandlers({
   win,
@@ -29,6 +30,7 @@ function registerIpcHandlers({
       theme: 'dark',
       activeTab: 'dashboard',
       launchMode: 'integrated',
+      authMode: 'authenticated',
       closeToTray: true,
       maxRam: '6G',
       minRam: '4G',
@@ -330,12 +332,42 @@ function registerIpcHandlers({
     return serverRunner.getStatus();
   });
 
+  ipcMain.handle('server:get-auth-status', async () => {
+    try {
+      const cfg = await getAppConfig();
+      const serverDir = cfg.serverDir || 'F:\\serverht\\Server';
+      return await getServerAuthSummary(serverDir, cfg.authMode || 'authenticated');
+    } catch (e) {
+      return { error: e.message, authenticated: false };
+    }
+  });
+
+  ipcMain.handle('server:set-auth-mode', async (_, mode) => {
+    try {
+      const cfg = await getAppConfig();
+      cfg.authMode = mode === 'insecure' ? 'insecure' : 'authenticated';
+      await saveAppConfig(cfg);
+      return { success: true, authMode: cfg.authMode };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('server:authenticate', async () => {
+    try {
+      return serverRunner.authenticateServer();
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
   ipcMain.handle('server:start', async (_, opts = {}) => {
     try {
       const cfg = await getAppConfig();
       const mode = opts.mode || cfg.launchMode || 'integrated';
       const maxRam = opts.maxRam || cfg.maxRam || '6G';
       const minRam = opts.minRam || cfg.minRam || '4G';
+      const authMode = opts.authMode || cfg.authMode || 'authenticated';
       const jvmOptions = opts.jvmOptions || [
         `-Xms${minRam}`,
         `-Xmx${maxRam}`,
@@ -344,6 +376,7 @@ function registerIpcHandlers({
       return await serverRunner.startServer({
         mode,
         jvmOptions,
+        authMode,
         extraArgs: opts.extraArgs || [],
       });
     } catch (e) {
@@ -436,6 +469,30 @@ function registerIpcHandlers({
   serverRunner.on('status-change', (status) => {
     if (!win.isDestroyed()) {
       win.webContents.send('server:status-change', status);
+    }
+  });
+
+  serverRunner.on('auth-device-code', (data) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('server:auth-device-code', data);
+    }
+  });
+
+  serverRunner.on('auth-status-change', (data) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('server:auth-status-change', data);
+    }
+  });
+
+  serverRunner.on('auth-profile', (data) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('server:auth-profile', data);
+    }
+  });
+
+  serverRunner.on('auth-warning', (data) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('server:auth-warning', data);
     }
   });
 }
