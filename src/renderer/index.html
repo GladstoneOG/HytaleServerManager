@@ -107,6 +107,42 @@
         </div>
       </header>
 
+      <!-- Launcher Auto-Update Notification Banner -->
+      <div id="launcher-update-banner" class="launcher-update-banner hidden" role="alert">
+        <div class="launcher-update-left">
+          <span class="update-icon-pulse"><svg class="ic"><use href="#i-sparkle"/></svg></span>
+          <div class="launcher-update-info">
+            <span class="launcher-update-badge">Launcher Update</span>
+            <span id="launcher-update-summary" class="launcher-update-summary">A new update is available from GitHub.</span>
+          </div>
+        </div>
+        <div class="launcher-update-right">
+          <button id="btn-launcher-update-now" class="btn btn-primary btn-sm">
+            <svg class="ic"><use href="#i-download"/></svg>
+            <span>Update Now</span>
+          </button>
+          <button id="btn-launcher-update-dismiss" class="icon-btn-sm" title="Dismiss banner">
+            <svg class="ic"><use href="#i-x"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Launcher Self-Update Progress Dock -->
+      <div id="launcher-update-dock" class="mod-action-dock hidden" role="status" aria-live="polite">
+        <div class="mod-action-dock-inner">
+          <div class="mod-action-row">
+            <div class="mod-action-label">
+              <span class="spinner-sm"></span>
+              <span id="launcher-update-dock-title">Updating Launcher...</span>
+            </div>
+            <div id="launcher-update-dock-stats" class="mod-action-stats mono">0%</div>
+          </div>
+          <div class="progress-track">
+            <div id="launcher-update-dock-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Active Mod Download / Update Progress Dock -->
       <div id="mod-action-dock" class="mod-action-dock hidden" role="status" aria-live="polite">
         <div class="mod-action-dock-inner">
@@ -612,6 +648,34 @@
                   </div>
                   <div class="setting-control">
                     <button id="btn-create-shortcut" class="btn btn-secondary btn-sm">Create shortcut</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <h2 class="settings-title">Launcher Updates</h2>
+              <div class="settings-card">
+                <div class="setting">
+                  <div class="setting-text">
+                    <div class="setting-label">Launcher version</div>
+                    <div id="settings-launcher-version-desc" class="setting-desc">Version 1.0.0 (commit <span class="mono" id="settings-launcher-commit">…</span>)</div>
+                  </div>
+                  <div class="setting-control">
+                    <button id="btn-settings-check-app-update" class="btn btn-secondary btn-sm">
+                      <svg class="ic"><use href="#i-refresh"/></svg>
+                      <span>Check for updates</span>
+                    </button>
+                    <button id="btn-settings-app-update-now" class="btn btn-primary btn-sm hidden">
+                      <svg class="ic"><use href="#i-download"/></svg>
+                      <span>Update Now</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="setting hidden" id="setting-launcher-update-details-row">
+                  <div class="setting-text">
+                    <div id="settings-launcher-update-status" class="setting-label text-success">Update available!</div>
+                    <div id="settings-launcher-update-desc" class="setting-desc mono">-</div>
                   </div>
                 </div>
               </div>

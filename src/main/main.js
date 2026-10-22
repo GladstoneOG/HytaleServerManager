@@ -18,6 +18,7 @@ const { ServerRunner } = require('./serverRunner');
 const { TrayManager } = require('./tray');
 const { CurseForgeClient } = require('./curseforge');
 const { ThunderstoreClient } = require('./thunderstore');
+const { AppUpdater } = require('./appUpdater');
 const { registerIpcHandlers } = require('./ipc');
 const { ensureDir, readJson } = require('./util');
 
@@ -69,6 +70,10 @@ async function createWindow() {
     thunderstoreClient: tsClient,
   });
   const serverRunner = new ServerRunner({ serverDir: defaultServerDir });
+  const appUpdater = new AppUpdater({
+    appDir: path.resolve(__dirname, '..', '..'),
+    serverRunner,
+  });
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -119,6 +124,7 @@ async function createWindow() {
     serverInstaller,
     modManager,
     serverRunner,
+    appUpdater,
     trayManager,
     cfClient,
     tsClient,

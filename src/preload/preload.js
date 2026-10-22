@@ -12,6 +12,16 @@ contextBridge.exposeInMainWorld('api', {
   setLoginItem: (enabled, openAsHidden) => ipcRenderer.invoke('app:set-login-item', enabled, openAsHidden),
   createShortcut: () => ipcRenderer.invoke('app:create-shortcut'),
 
+  // Launcher Self-Update
+  checkForAppUpdates: () => ipcRenderer.invoke('app:check-for-updates'),
+  getAppVersionInfo: () => ipcRenderer.invoke('app:get-version-info'),
+  performAppUpdate: () => ipcRenderer.invoke('app:perform-update'),
+  onAppUpdateProgress: (cb) => {
+    const fn = (_, data) => cb(data);
+    ipcRenderer.on('app:update-progress', fn);
+    return () => ipcRenderer.removeListener('app:update-progress', fn);
+  },
+
   // Hytale Account
   getHytaleStatus: () => ipcRenderer.invoke('hytale:get-status'),
   startDeviceLogin: () => ipcRenderer.invoke('hytale:start-device-login'),

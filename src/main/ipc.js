@@ -17,6 +17,7 @@ function registerIpcHandlers({
   serverInstaller,
   modManager,
   serverRunner,
+  appUpdater,
   trayManager,
   cfClient,
   tsClient,
@@ -67,6 +68,26 @@ function registerIpcHandlers({
     } catch (e) {
       return { success: false, error: e.message, created: [] };
     }
+  });
+
+  // --- Launcher App Self-Update ---
+  ipcMain.handle('app:check-for-updates', async () => {
+    if (!appUpdater) return { updateAvailable: false, error: 'App updater not initialized' };
+    return await appUpdater.checkForUpdates();
+  });
+
+  ipcMain.handle('app:get-version-info', async () => {
+    if (!appUpdater) return { version: '1.0.0', commit: 'unknown' };
+    return await appUpdater.getVersionInfo();
+  });
+
+  ipcMain.handle('app:perform-update', async () => {
+    if (!appUpdater) return { success: false, error: 'App updater not initialized' };
+    return await appUpdater.performUpdate((progress) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('app:update-progress', progress);
+      }
+    });
   });
 
   ipcMain.handle('dialog:select-server-dir', async () => {

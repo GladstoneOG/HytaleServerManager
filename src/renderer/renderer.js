@@ -152,6 +152,24 @@ const btnTriggerDeviceLogin = $('btn-trigger-device-login');
 const settingsCfApiKey = $('settings-cf-api-key');
 const btnCreateShortcut = $('btn-create-shortcut');
 
+// Launcher Self-Update UI
+const launcherUpdateBanner = $('launcher-update-banner');
+const launcherUpdateSummary = $('launcher-update-summary');
+const btnLauncherUpdateNow = $('btn-launcher-update-now');
+const btnLauncherUpdateDismiss = $('btn-launcher-update-dismiss');
+const launcherUpdateDock = $('launcher-update-dock');
+const launcherUpdateDockTitle = $('launcher-update-dock-title');
+const launcherUpdateDockStats = $('launcher-update-dock-stats');
+const launcherUpdateDockFill = $('launcher-update-dock-fill');
+
+const settingsLauncherVersionDesc = $('settings-launcher-version-desc');
+const settingsLauncherCommit = $('settings-launcher-commit');
+const btnSettingsCheckAppUpdate = $('btn-settings-check-app-update');
+const btnSettingsAppUpdateNow = $('btn-settings-app-update-now');
+const settingLauncherUpdateDetailsRow = $('setting-launcher-update-details-row');
+const settingsLauncherUpdateStatus = $('settings-launcher-update-status');
+const settingsLauncherUpdateDesc = $('settings-launcher-update-desc');
+
 // Setup Wizard Modal
 const installModal = $('install-modal');
 const modalInstallCloseBtn = $('modal-install-close-btn');
@@ -713,6 +731,7 @@ async function init() {
       loadProfilesCount(),
       loadRestorePointUI(),
       loadCfCategories(),
+      checkLauncherUpdate(false),
     ]);
   } catch (e) {
     showToast(`Initialization failed: ${e.message}`, 'error');
@@ -953,6 +972,174 @@ btnUpdateServerNow.addEventListener('click', async () => {
     unlisten();
   }
 });
+
+// ============================================================================
+// Launcher Self-Update (GitHub Repository Auto-Checker & 1-Click Update)
+// ============================================================================
+let latestLauncherUpdate = null;
+
+async function checkLauncherUpdate(isManual = false) {
+  try {
+    if (isManual && btnSettingsCheckAppUpdate) {
+      btnSettingsCheckAppUpdate.disabled = true;
+      btnSettingsCheckAppUpdate.innerHTML = '<span class="spinner-sm"></span> Checking…';
+    }
+
+    const versionInfo = await window.api.getAppVersionInfo();
+    if (settingsLauncherCommit && versionInfo?.commit) {
+      settingsLauncherCommit.textContent = versionInfo.commit;
+    }
+
+    const res = await window.api.checkForAppUpdates();
+    latestLauncherUpdate = res;
+
+    if (res && res.updateAvailable) {
+      // Show top alert banner
+      if (launcherUpdateBanner) {
+        launcherUpdateBanner.classList.remove('hidden');
+      }
+      if (launcherUpdateSummary) {
+        const msg = res.commitMessage ? ` - ${res.commitMessage}` : '';
+        launcherUpdateSummary.textContent = `New build (${res.remoteCommit})${msg}`;
+        launcherUpdateSummary.title = res.commitMessage || '';
+      }
+
+      // Update Settings UI
+      if (settingLauncherUpdateDetailsRow) {
+        settingLauncherUpdateDetailsRow.classList.remove('hidden');
+      }
+      if (settingsLauncherUpdateStatus) {
+        settingsLauncherUpdateStatus.textContent = `Update available: ${res.remoteCommit}`;
+        settingsLauncherUpdateStatus.className = 'setting-label text-success';
+      }
+      if (settingsLauncherUpdateDesc) {
+        settingsLauncherUpdateDesc.textContent = res.commitMessage || `Commit ${res.remoteCommit}`;
+      }
+      if (btnSettingsAppUpdateNow) {
+        btnSettingsAppUpdateNow.classList.remove('hidden');
+      }
+
+      if (isManual) {
+        showToast(`New launcher update found: ${res.remoteCommit}`, 'success');
+      }
+    } else {
+      // Up to date
+      if (launcherUpdateBanner) {
+        launcherUpdateBanner.classList.add('hidden');
+      }
+      if (btnSettingsAppUpdateNow) {
+        btnSettingsAppUpdateNow.classList.add('hidden');
+      }
+      if (isManual) {
+        if (settingLauncherUpdateDetailsRow) {
+          settingLauncherUpdateDetailsRow.classList.remove('hidden');
+        }
+        if (settingsLauncherUpdateStatus) {
+          settingsLauncherUpdateStatus.textContent = res?.error ? 'Check failed' : 'Launcher is up to date';
+          settingsLauncherUpdateStatus.className = res?.error ? 'setting-label text-danger' : 'setting-label text-secondary';
+        }
+        if (settingsLauncherUpdateDesc) {
+          settingsLauncherUpdateDesc.textContent = res?.error
+            ? res.error
+            : `Current commit: ${res?.localCommit || versionInfo?.commit || 'latest'}`;
+        }
+        if (res?.error) {
+          showToast(`Update check failed: ${res.error}`, 'error');
+        } else {
+          showToast(`Launcher is up to date (${res?.localCommit || versionInfo?.commit || 'latest'})!`, 'success');
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Renderer] Launcher update check error:', err);
+    if (isManual) {
+      showToast(`Update check failed: ${err.message}`, 'error');
+    }
+  } finally {
+    if (btnSettingsCheckAppUpdate) {
+      btnSettingsCheckAppUpdate.disabled = false;
+      btnSettingsCheckAppUpdate.innerHTML = '<svg class="ic"><use href="#i-refresh"/></svg><span>Check for updates</span>';
+    }
+  }
+}
+
+async function performLauncherUpdate() {
+  const commitStr = latestLauncherUpdate?.remoteCommit ? ` (${latestLauncherUpdate.remoteCommit})` : '';
+  const ok = await confirmDialog({
+    title: 'Update Launcher Now?',
+    message: `The latest version${commitStr} will be fetched from GitHub and the manager will restart automatically.`,
+    confirmLabel: 'Update Now',
+  });
+  if (!ok) return;
+
+  if (btnLauncherUpdateNow) {
+    btnLauncherUpdateNow.disabled = true;
+    btnLauncherUpdateNow.innerHTML = '<span class="spinner-sm"></span> Updating…';
+  }
+  if (btnSettingsAppUpdateNow) {
+    btnSettingsAppUpdateNow.disabled = true;
+    btnSettingsAppUpdateNow.innerHTML = '<span class="spinner-sm"></span> Updating…';
+  }
+
+  if (launcherUpdateDock) {
+    launcherUpdateDock.classList.remove('hidden');
+  }
+  if (launcherUpdateDockTitle) {
+    launcherUpdateDockTitle.textContent = 'Updating Launcher...';
+  }
+  if (launcherUpdateDockStats) {
+    launcherUpdateDockStats.textContent = '0%';
+  }
+  if (launcherUpdateDockFill) {
+    launcherUpdateDockFill.style.width = '0%';
+  }
+
+  const unlistenProgress = window.api.onAppUpdateProgress((prog) => {
+    if (launcherUpdateDockTitle && prog.message) {
+      launcherUpdateDockTitle.textContent = prog.message;
+    }
+    if (launcherUpdateDockStats && typeof prog.percent === 'number') {
+      launcherUpdateDockStats.textContent = `${prog.percent}%`;
+    }
+    if (launcherUpdateDockFill && typeof prog.percent === 'number') {
+      launcherUpdateDockFill.style.width = `${prog.percent}%`;
+    }
+  });
+
+  try {
+    await window.api.performAppUpdate();
+    showToast('Launcher updated successfully! Restarting…', 'success');
+  } catch (err) {
+    unlistenProgress();
+    showToast(`Launcher update failed: ${err.message}`, 'error');
+    if (launcherUpdateDock) {
+      launcherUpdateDock.classList.add('hidden');
+    }
+    if (btnLauncherUpdateNow) {
+      btnLauncherUpdateNow.disabled = false;
+      btnLauncherUpdateNow.innerHTML = '<svg class="ic"><use href="#i-download"/></svg><span>Update Now</span>';
+    }
+    if (btnSettingsAppUpdateNow) {
+      btnSettingsAppUpdateNow.disabled = false;
+      btnSettingsAppUpdateNow.innerHTML = '<svg class="ic"><use href="#i-download"/></svg><span>Update Now</span>';
+    }
+  }
+}
+
+if (btnLauncherUpdateNow) {
+  btnLauncherUpdateNow.addEventListener('click', performLauncherUpdate);
+}
+if (btnSettingsAppUpdateNow) {
+  btnSettingsAppUpdateNow.addEventListener('click', performLauncherUpdate);
+}
+if (btnSettingsCheckAppUpdate) {
+  btnSettingsCheckAppUpdate.addEventListener('click', () => checkLauncherUpdate(true));
+}
+if (btnLauncherUpdateDismiss) {
+  btnLauncherUpdateDismiss.addEventListener('click', () => {
+    if (launcherUpdateBanner) launcherUpdateBanner.classList.add('hidden');
+  });
+}
 
 // ============================================================================
 // Server Setup Wizard

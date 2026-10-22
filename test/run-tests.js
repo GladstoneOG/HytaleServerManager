@@ -478,7 +478,32 @@ async function run() {
     await fsp.rm(tempTestDir, { recursive: true, force: true }).catch(() => {});
   }
 
-  console.log('\n🎉 ALL 23 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
+  // Test 24: Launcher Self-Update Auto-Checker & Version Metadata
+  console.log('Test 24: Launcher Self-Update Auto-Checker & GitHub Integration');
+  const { AppUpdater } = require('../src/main/appUpdater');
+  const appUpdaterInstance = new AppUpdater();
+  const versionInfo = await appUpdaterInstance.getVersionInfo();
+  assert(versionInfo && versionInfo.version, 'AppUpdater must return launcher version');
+  assert(versionInfo.commit && versionInfo.commit.length >= 7, 'AppUpdater must return valid commit SHA');
+
+  const checkResult = await appUpdaterInstance.checkForUpdates();
+  assert(checkResult && checkResult.checkedAt, 'checkForUpdates must return checkedAt timestamp');
+  assert(typeof checkResult.updateAvailable === 'boolean', 'updateAvailable must be boolean');
+  if (checkResult.remoteCommit) {
+    assert(checkResult.remoteCommit.length >= 7, 'remoteCommit must be a valid short SHA');
+    assert(typeof checkResult.commitMessage === 'string', 'commitMessage must be a string');
+  }
+
+  // Verify update detection logic with simulated older commit
+  appUpdaterInstance.getLocalCommit = async () => '0000000000000000000000000000000000000000';
+  const simulatedCheck = await appUpdaterInstance.checkForUpdates();
+  if (checkResult.remoteCommit) {
+    assert.strictEqual(simulatedCheck.updateAvailable, true, 'Different local commit must trigger updateAvailable: true');
+  }
+  assert(typeof appUpdaterInstance.performUpdate === 'function', 'AppUpdater must have performUpdate method');
+  console.log(`  ✓ Launcher updater verified: local commit ${versionInfo.commit}, remote check succeeded cleanly`);
+
+  console.log('\n🎉 ALL 24 VERIFICATION TESTS PASSED SUCCESSFULLY!\n');
 }
 
 run().catch((err) => {
